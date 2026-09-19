@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getRole, setRole, clearRole } from './lib/storage';
 import RolePicker from './components/RolePicker';
 import AdminRoot from './components/AdminRoot';
+import React from 'react';
 import PublicViewer from './components/public/PublicViewer';
 
 export default function App() {

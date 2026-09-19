@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { isUnlocked, getCurrentEventId, clearCurrentEventId } from '../lib/storage';
 import Lock from './Lock';
 import EventPicker from './EventPicker';

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { getEvents, createEventEntry, deleteEventEntry, setCurrentEventId, getJsonbinKey, setJsonbinKey } from '../lib/storage';
 import { importSyncedEvent } from '../lib/cloud';
 import { uid } from '../lib/constants';

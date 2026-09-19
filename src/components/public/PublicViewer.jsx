@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { fetchRegistryList, fetchPublicSnapshot } from '../../lib/cloud';
 
 function useRegistryId() {

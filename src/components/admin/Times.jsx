@@ -1,3 +1,5 @@
+import React from 'react';
+
 export default function Times({ t }) {
   if (t.teams.length === 0) {
     return <div className="empty"><div className="big">🏆</div>Cadastre times na aba Elenco.</div>;

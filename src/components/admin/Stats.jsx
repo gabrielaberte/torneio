@@ -1,3 +1,5 @@
+import React from 'react';
+
 function topN(t, key, n, filterGender) {
   let arr = t.state.roster.map(p => ({ id: p.id, name: p.name, gender: p.gender, val: t.getStats(p.id)[key] || 0 }));
   if (filterGender) arr = arr.filter(p => p.gender === filterGender);

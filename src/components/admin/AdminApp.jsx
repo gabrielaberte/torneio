@@ -1,3 +1,5 @@
+import React from 'react';
+
 import { useState } from 'react';
 import { getEvents } from '../../lib/storage';
 import { useTournament } from '../../hooks/useTournament';

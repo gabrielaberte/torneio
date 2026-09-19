@@ -1,3 +1,5 @@
+import React from 'react';
+
 import { useState } from 'react';
 import { EVENT_TYPES } from '../../lib/constants';
 import { useToast } from '../ui/Toast';

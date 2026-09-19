@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { getPin, setPin, resetPin, setUnlocked } from '../lib/storage';
 import { useToast } from './ui/Toast';
 

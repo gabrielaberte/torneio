@@ -1,3 +1,5 @@
+import React from 'react';
+
 import { useState } from 'react';
 import { getJsonbinKey, setJsonbinKey, getRegistryId, getViewerUrl, setViewerUrl } from '../../lib/storage';
 import { useToast } from '../ui/Toast';
