@@ -97,6 +97,11 @@ export default function Jogo({ t }) {
     }
   }
 
+  function pickTeamPoint(team) {
+    t.registerTeamPoint(team);
+    setModal(null);
+  }
+
   return (
     <>
       <div className="scoreboard">
@@ -121,6 +126,13 @@ export default function Jogo({ t }) {
             </button>
           ))}
         </div>
+        <button
+          className="btn btn-ghost btn-block"
+          style={{ marginTop: 12 }}
+          onClick={() => setModal({ step: 'pickTeamPoint' })}
+        >
+          + Ponto coletivo (sem jogador)
+        </button>
         <button
           className="btn btn-ghost btn-block"
           style={{ marginTop: 12 }}
@@ -172,6 +184,20 @@ export default function Jogo({ t }) {
                 </div>
               ))}
               <div className="pick-row" style={{ justifyContent: 'center', color: 'rgba(15,42,61,.5)' }} onClick={() => { t.chooseReceiver(null); setModal(null); }}>Pular</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal && modal.step === 'pickTeamPoint' && (
+        <div className="overlay" onClick={() => setModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setModal(null)}>×</button>
+            <h3>Ponto coletivo</h3>
+            <div className="modal-sub">Escolha o time que recebe o ponto. Nenhuma estatística individual será alterada.</div>
+            <div className="pick-list">
+              <div className="pick-row" onClick={() => pickTeamPoint(m.teamA)}><span>{m.teamA}</span></div>
+              <div className="pick-row" onClick={() => pickTeamPoint(m.teamB)}><span>{m.teamB}</span></div>
             </div>
           </div>
         </div>

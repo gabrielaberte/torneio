@@ -137,6 +137,25 @@ export function useTournament(eventId) {
     return askReceiver ? { askReceiver } : {};
   }
 
+  function registerTeamPoint(team) {
+    update(s => {
+      const m = s.current;
+      m.undoStack ||= [];
+      m.undoStack.push({
+        match: snapshotMatch(m),
+        playerId: null,
+        stat: null,
+        addsPoint: false,
+        receiverId: null
+      });
+
+      if (team === m.teamA) m.currentSet.a += 1; else m.currentSet.b += 1;
+      m.log.push({ text: `Ponto coletivo: ${team}`, score: `${m.currentSet.a}-${m.currentSet.b}` });
+      checkSetEnd(s);
+      return s;
+    });
+  }
+
   function chooseReceiver(receiverId) {
     update(s => {
       const m = s.current;
@@ -162,9 +181,11 @@ export function useTournament(eventId) {
       const m = s.current;
       const lastPoint = m.undoStack.pop();
 
-      decrementStat(s.playerStats[lastPoint.playerId], lastPoint.stat);
-      decrementStat(m.matchStats[lastPoint.playerId], lastPoint.stat);
-      if (lastPoint.addsPoint) {
+      if (lastPoint.playerId && lastPoint.stat) {
+        decrementStat(s.playerStats[lastPoint.playerId], lastPoint.stat);
+        decrementStat(m.matchStats[lastPoint.playerId], lastPoint.stat);
+      }
+      if (lastPoint.playerId && lastPoint.addsPoint) {
         decrementStat(s.playerStats[lastPoint.playerId], 'points');
         decrementStat(m.matchStats[lastPoint.playerId], 'points');
       }
@@ -267,7 +288,7 @@ export function useTournament(eventId) {
   return {
     state, teams, playersOfTeam, getStats, playerName,
     addPlayer, deletePlayer,
-    startMatch, cancelMatch, registerEvent, chooseReceiver, undoLastPoint, finalizeMatch,
+    startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, activateSync, pushNow,
     exportBackup, importBackup,
     setModal
