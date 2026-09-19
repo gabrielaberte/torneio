@@ -77,6 +77,18 @@ export function setRegistryId(id) { localStorage.setItem('volei_registry_id', id
 export function getViewerUrl() { return localStorage.getItem('volei_viewer_url') || ''; }
 export function setViewerUrl(url) { localStorage.setItem('volei_viewer_url', url); }
 
+export function getPendingPublicationIds() {
+  try { return JSON.parse(localStorage.getItem('volei_pending_publications') || '[]'); }
+  catch (e) { return []; }
+}
+export function markPublicationPending(eventId) {
+  const ids = getPendingPublicationIds();
+  if (!ids.includes(eventId)) localStorage.setItem('volei_pending_publications', JSON.stringify([...ids, eventId]));
+}
+export function clearPendingPublication(eventId) {
+  localStorage.setItem('volei_pending_publications', JSON.stringify(getPendingPublicationIds().filter(id => id !== eventId)));
+}
+
 /* ---------- Backup manual (texto) ---------- */
 export function exportBackupText(eventName, state) {
   return JSON.stringify({ eventName, state });

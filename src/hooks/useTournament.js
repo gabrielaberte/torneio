@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { EVENT_TYPES, emptyStats, uid } from '../lib/constants';
 import {
   defaultState, loadEventState, saveEventState, getEvents,
-  getJsonbinKey, getRegistryId, setRegistryId, getViewerUrl
+  getJsonbinKey, getRegistryId, setRegistryId, getViewerUrl,
+  getPendingPublicationIds, markPublicationPending, clearPendingPublication
 } from '../lib/storage';
 import { publishSnapshot as cloudPublish, activateSync as cloudActivateSync, pushCloud, pullCloud } from '../lib/cloud';
 import { useToast } from '../components/ui/Toast';
@@ -10,6 +11,7 @@ import { useToast } from '../components/ui/Toast';
 export function useTournament(eventId) {
   const toast = useToast();
   const [state, setState] = useState(() => loadEventState(eventId));
+  const [publicationPending, setPublicationPending] = useState(() => getPendingPublicationIds().includes(eventId));
   const syncTimer = useRef(null);
   const loadedFor = useRef(eventId);
 
@@ -31,6 +33,17 @@ export function useTournament(eventId) {
         }
       } catch (e) { /* offline ou nunca sincronizado, segue local */ }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId]);
+
+  useEffect(() => {
+    setPublicationPending(getPendingPublicationIds().includes(eventId));
+    function retryPendingPublication() {
+      if (getPendingPublicationIds().includes(eventId)) publish(true);
+    }
+    window.addEventListener('online', retryPendingPublication);
+    if (navigator.onLine) retryPendingPublication();
+    return () => window.removeEventListener('online', retryPendingPublication);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
@@ -282,9 +295,15 @@ export function useTournament(eventId) {
   }
 
   /* ---------- Nuvem: publicação pública + sincronização privada ---------- */
-  async function publish() {
+  async function publish(isAutomaticRetry = false) {
     const key = getJsonbinKey();
     if (!key) { toast('Cole e salve sua Master Key primeiro (card "Conta jsonbin.io")'); return; }
+    if (!navigator.onLine) {
+      markPublicationPending(eventId);
+      setPublicationPending(true);
+      if (!isAutomaticRetry) toast('Sem internet: publicação pendente até a conexão voltar.');
+      return;
+    }
     try {
       const { eventBinId, registryId } = await cloudPublish(
         key, currentEventName(eventId), state.jsonbin.id, getRegistryId(),
@@ -292,8 +311,12 @@ export function useTournament(eventId) {
       );
       setRegistryId(registryId);
       update(s => { s.jsonbin = { id: eventBinId }; return s; });
+      clearPendingPublication(eventId);
+      setPublicationPending(false);
       toast('✅ Placar publicado! Quem tiver o link fixo já vê este torneio na lista.');
     } catch (e) {
+      markPublicationPending(eventId);
+      setPublicationPending(true);
       toast('Não foi possível publicar — confira sua conexão e a Master Key.');
     }
   }
@@ -336,7 +359,7 @@ export function useTournament(eventId) {
     addPlayer, deletePlayer,
     saveGroups, generateBracket, updateBracketMatch, moveBracketMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
-    publish, activateSync, pushNow,
+    publish, publicationPending, activateSync, pushNow,
     exportBackup, importBackup,
     setModal
   };

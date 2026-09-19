@@ -61,6 +61,7 @@ export default function Historico({ t, eventName }) {
         {fixedLink ? (
           <div className="muted" style={{ marginTop: 14 }}>Link fixo pra compartilhar (nunca muda, mesmo em torneios futuros):<br /><b style={{ wordBreak: 'break-all' }}>{fixedLink}</b></div>
         ) : <div className="muted" style={{ marginTop: 10 }}>O link fixo aparece aqui depois da primeira publicação.</div>}
+        {t.publicationPending && <div className="muted" style={{ marginTop: 12 }}>⏳ Publicação pendente: será enviada automaticamente quando a internet voltar.</div>}
         <button className="btn btn-navy btn-block" style={{ marginTop: 14 }} onClick={t.publish}>Publicar placar deste torneio</button>
       </div>
 
