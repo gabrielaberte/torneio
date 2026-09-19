@@ -51,7 +51,7 @@ export default function EventPicker({ onOpenEvent, onSwitchRole }) {
   return (
     <>
       <div className="topbar">
-        <div className="brand"><div className="ball" /><h1>Placar Vôlei</h1></div>
+        <div className="brand"><div className="ball" /><h1>Torneio de Maluco</h1></div>
         <div className="sub" onClick={onSwitchRole}>Selecione um torneio · trocar modo</div>
       </div>
       <div className="content">

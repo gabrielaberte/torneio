@@ -11,6 +11,7 @@ export default function Jogo({ t }) {
   const [bestOf, setBestOf] = useState(3);
   const [targetSel, setTargetSel] = useState('25');
   const [customTarget, setCustomTarget] = useState('');
+  const [bracketMatchId, setBracketMatchId] = useState('');
   const [modal, setModal] = useState(null); // null | 'pickType' | {step:'pickPlayer',evt} | {step:'pickReceiver',opponentTeam}
   const [mvpId, setMvpId] = useState('');
 
@@ -21,15 +22,34 @@ export default function Jogo({ t }) {
   }
 
   if (!m) {
+    const scheduledMatches = ((t.state.bracket && t.state.bracket.matches) || []).filter(match =>
+      match.status === 'scheduled' && t.teams.includes(match.teamA) && t.teams.includes(match.teamB)
+    );
     return (
       <div className="card">
         <h3>Novo jogo</h3>
+        {scheduledMatches.length > 0 && (
+          <>
+            <label>Confronto do chaveamento</label>
+            <select value={bracketMatchId} onChange={event => {
+              const id = event.target.value;
+              setBracketMatchId(id);
+              const match = scheduledMatches.find(item => item.id === id);
+              if (match) { setTeamA(match.teamA); setTeamB(match.teamB); }
+            }}>
+              <option value="">Escolher times manualmente</option>
+              {scheduledMatches.map(match => (
+                <option key={match.id} value={match.id}>{match.phase}: {match.teamA} × {match.teamB}{match.scheduledAt ? ` · ${new Date(match.scheduledAt).toLocaleString('pt-BR')}` : ''}</option>
+              ))}
+            </select>
+          </>
+        )}
         <label>Time A</label>
-        <select value={teamA} onChange={e => setTeamA(e.target.value)}>
+        <select value={teamA} onChange={e => { setTeamA(e.target.value); setBracketMatchId(''); }}>
           {t.teams.map(tm => <option key={tm} value={tm}>{tm}</option>)}
         </select>
         <label>Time B</label>
-        <select value={teamB} onChange={e => setTeamB(e.target.value)}>
+        <select value={teamB} onChange={e => { setTeamB(e.target.value); setBracketMatchId(''); }}>
           {t.teams.map(tm => <option key={tm} value={tm}>{tm}</option>)}
         </select>
         <label>Melhor de</label>
@@ -54,7 +74,7 @@ export default function Jogo({ t }) {
           if (teamA === teamB) { toast('Escolha times diferentes'); return; }
           const target = targetSel === 'custom' ? parseInt(customTarget, 10) : parseInt(targetSel, 10);
           if (!target || target < 1) { toast('Informe um número válido de pontos por set'); return; }
-          t.startMatch({ teamA, teamB, bestOf, target });
+          t.startMatch({ teamA, teamB, bestOf, target, bracketMatchId: bracketMatchId || null });
         }}>Iniciar jogo</button>
       </div>
     );

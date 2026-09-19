@@ -66,7 +66,7 @@ export default function PublicViewer({ onSwitchRole }) {
             <div className={`tab ${tab === 'jogos' ? 'active' : ''}`} onClick={() => setTab('jogos')}>Próximos jogos</div>
           </div>
           <div className="content">
-            {tab === 'times' ? <StandingsView snapshot={snapshot} /> : <ScheduleView />}
+            {tab === 'times' ? <StandingsView snapshot={snapshot} /> : <ScheduleView snapshot={snapshot} />}
           </div>
         </>
       ) : (
@@ -127,6 +127,38 @@ function StandingsView({ snapshot }) {
   );
 }
 
-function ScheduleView() {
+function ScheduleView({ snapshot }) {
+  if (!snapshot || !snapshot.schedule || snapshot.schedule.length === 0) {
+    return <div className="empty"><div className="big">📅</div>O chaveamento ainda não foi publicado.</div>;
+  }
+  const statusText = { scheduled: 'Agendado', live: 'Em andamento', done: 'Finalizado' };
+  const live = snapshot.liveMatch;
+  return (
+    <>
+      {live && (
+        <div className="card" style={{ border: '2px solid #e85d04' }}>
+          <div style={{ fontWeight: 800, color: '#e85d04', marginBottom: 6 }}>● PARTIDA EM ANDAMENTO · SET {live.setNumber}</div>
+          <div style={{ fontWeight: 800, fontSize: 18 }}>{live.teamA} {live.scoreA} × {live.scoreB} {live.teamB}</div>
+          <div className="muted">Sets: {live.setsWonA} × {live.setsWonB}</div>
+        </div>
+      )}
+      {snapshot.groups && (snapshot.groups.groupA.length || snapshot.groups.groupB.length) && (
+        <div className="card">
+          <h3>Grupos</h3>
+          <div className="muted"><b>Grupo A:</b> {snapshot.groups.groupA.join(' · ')}</div>
+          <div className="muted" style={{ marginTop: 6 }}><b>Grupo B:</b> {snapshot.groups.groupB.join(' · ')}</div>
+        </div>
+      )}
+      {snapshot.schedule.map((match, index) => (
+        <div className="card" key={match.id || index}>
+          <div className="muted" style={{ fontWeight: 800 }}>{index + 1}. {match.phase}</div>
+          <div style={{ fontWeight: 800, margin: '5px 0' }}>{match.teamA} × {match.teamB}</div>
+          <div className="muted">{match.scheduledAt ? new Date(match.scheduledAt).toLocaleString('pt-BR') : 'Horário a definir'} · {statusText[match.status] || statusText.scheduled}</div>
+        </div>
+      ))}
+      <div className="updated">Atualizado em {new Date(snapshot.updatedAt).toLocaleString('pt-BR')}</div>
+    </>
+  );
+  /* legacy placeholder */
   return <div className="empty"><div className="big">📅</div>A tabela de próximos jogos ainda está sendo preparada.<br />Em breve você vai ver aqui os horários e confrontos.</div>;
 }

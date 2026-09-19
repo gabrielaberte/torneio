@@ -4,7 +4,7 @@ export default function RolePicker({ onChoose }) {
   return (
     <>
       <div className="topbar">
-        <div className="brand"><div className="ball" /><h1>Placar Vôlei</h1></div>
+        <div className="brand"><div className="ball" /><h1>Torneio de Maluco</h1></div>
         <div className="sub">Como você quer entrar?</div>
       </div>
       <div className="content" style={{ paddingTop: 30 }}>

@@ -47,12 +47,18 @@ export async function updateRegistry(key, registryId, eventBinId, eventName) {
 }
 
 /** Publica a classificação/resultados públicos deste torneio + atualiza o índice. */
-export async function publishSnapshot(key, eventName, jsonbinId, registryId, teams, standings, history) {
+export async function publishSnapshot(key, eventName, jsonbinId, registryId, teams, standings, history, bracket, current) {
   const snapshot = {
     updatedAt: new Date().toISOString(),
     standings: teams.map(t => ({ name: t, wins: standings[t] || 0 })).sort((a, b) => b.wins - a.wins),
     matches: history.map(m => ({ teamA: m.teamA, teamB: m.teamB, setsWonA: m.setsWonA, setsWonB: m.setsWonB, winner: m.winner })),
-    schedule: []
+    schedule: (bracket && bracket.matches) || [],
+    groups: bracket ? { groupA: bracket.groupA || [], groupB: bracket.groupB || [] } : { groupA: [], groupB: [] },
+    liveMatch: current ? {
+      teamA: current.teamA, teamB: current.teamB, scoreA: current.currentSet.a,
+      scoreB: current.currentSet.b, setsWonA: current.setsWonA, setsWonB: current.setsWonB,
+      setNumber: current.sets.length + 1
+    } : null
   };
   const eventBinId = await ensureEventBin(key, eventName, jsonbinId);
   await jfetch(BASE + '/' + eventBinId, {

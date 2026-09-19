@@ -8,12 +8,14 @@ import Jogo from './Jogo';
 import Stats from './Stats';
 import Times from './Times';
 import Historico from './Historico';
+import Chaveamento from './Chaveamento';
 
 const TABS = [
   ['elenco', 'Elenco'],
   ['jogo', 'Jogo'],
   ['stats', 'Estatísticas'],
   ['times', 'Times'],
+  ['chaveamento', 'Chaveamento'],
   ['historico', 'Histórico']
 ];
 
@@ -25,7 +27,7 @@ export default function AdminApp({ eventId, onSwitchEvent, onSwitchRole }) {
   return (
     <>
       <div className="topbar">
-        <div className="brand"><div className="ball" /><h1>Placar Vôlei</h1></div>
+        <div className="brand"><div className="ball" /><h1>Torneio de Maluco</h1></div>
         <div className="sub">
           <span onClick={onSwitchEvent}>{eventName} · trocar torneio ↺</span>
           {' '}|{' '}
@@ -42,6 +44,7 @@ export default function AdminApp({ eventId, onSwitchEvent, onSwitchRole }) {
         {tab === 'jogo' && <Jogo t={t} />}
         {tab === 'stats' && <Stats t={t} />}
         {tab === 'times' && <Times t={t} />}
+        {tab === 'chaveamento' && <Chaveamento t={t} />}
         {tab === 'historico' && <Historico t={t} eventName={eventName} />}
       </div>
     </>

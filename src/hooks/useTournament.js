@@ -84,14 +84,23 @@ export function useTournament(eventId) {
   }
 
   /* ---------- Jogo ao vivo ---------- */
-  function startMatch({ teamA, teamB, bestOf, target }) {
+  function startMatch({ teamA, teamB, bestOf, target, bracketMatchId = null }) {
     update(s => {
-      s.current = { teamA, teamB, bestOf, target, sets: [], setsWonA: 0, setsWonB: 0, currentSet: { a: 0, b: 0 }, log: [], matchStats: {}, undoStack: [] };
+      s.current = { teamA, teamB, bestOf, target, bracketMatchId, sets: [], setsWonA: 0, setsWonB: 0, currentSet: { a: 0, b: 0 }, log: [], matchStats: {}, undoStack: [] };
+      if (bracketMatchId && s.bracket && s.bracket.matches) {
+        s.bracket.matches = s.bracket.matches.map(match => match.id === bracketMatchId ? { ...match, status: 'live' } : match);
+      }
       return s;
     });
   }
   function cancelMatch() {
-    update(s => { s.current = null; return s; });
+    update(s => {
+      if (s.current && s.current.bracketMatchId && s.bracket && s.bracket.matches) {
+        s.bracket.matches = s.bracket.matches.map(match => match.id === s.current.bracketMatchId ? { ...match, status: 'scheduled' } : match);
+      }
+      s.current = null;
+      return s;
+    });
   }
 
   /** Registra um evento de ponto. Se for Ace, retorna {askReceiver:true, opponentTeam} pro componente abrir o próximo passo. */
@@ -135,6 +144,40 @@ export function useTournament(eventId) {
       return s;
     });
     return askReceiver ? { askReceiver } : {};
+  }
+
+  /* ---------- Chaveamento e agenda ---------- */
+  function saveGroups(groupA, groupB) {
+    update(s => {
+      s.bracket = { ...(s.bracket || {}), groupA, groupB, matches: (s.bracket && s.bracket.matches) || [] };
+      return s;
+    });
+  }
+  function generateBracket(groupA, groupB) {
+    update(s => {
+      s.bracket = { groupA, groupB, matches: buildBracketMatches(groupA, groupB) };
+      return s;
+    });
+  }
+  function updateBracketMatch(id, changes) {
+    update(s => {
+      const bracket = s.bracket || { groupA: [], groupB: [], matches: [] };
+      bracket.matches = bracket.matches.map(match => match.id === id ? { ...match, ...changes } : match);
+      s.bracket = bracket;
+      return s;
+    });
+  }
+  function moveBracketMatch(id, direction) {
+    update(s => {
+      const bracket = s.bracket || { groupA: [], groupB: [], matches: [] };
+      const index = bracket.matches.findIndex(match => match.id === id);
+      const target = index + direction;
+      if (index >= 0 && target >= 0 && target < bracket.matches.length) {
+        [bracket.matches[index], bracket.matches[target]] = [bracket.matches[target], bracket.matches[index]];
+      }
+      s.bracket = bracket;
+      return s;
+    });
   }
 
   function registerTeamPoint(team) {
@@ -229,6 +272,9 @@ export function useTournament(eventId) {
       s.standings[m.winner] = (s.standings[m.winner] || 0) + 1;
       const mvpName = (s.roster.find(p => p.id === mvpId) || {}).name || '—';
       s.history.push({ teamA: m.teamA, teamB: m.teamB, sets: m.sets, setsWonA: m.setsWonA, setsWonB: m.setsWonB, winner: m.winner, mvpName });
+      if (m.bracketMatchId && s.bracket && s.bracket.matches) {
+        s.bracket.matches = s.bracket.matches.map(match => match.id === m.bracketMatchId ? { ...match, status: 'done' } : match);
+      }
       s.current = null;
       return s;
     });
@@ -242,7 +288,7 @@ export function useTournament(eventId) {
     try {
       const { eventBinId, registryId } = await cloudPublish(
         key, currentEventName(eventId), state.jsonbin.id, getRegistryId(),
-        teams, state.standings, state.history
+        teams, state.standings, state.history, state.bracket, state.current
       );
       setRegistryId(registryId);
       update(s => { s.jsonbin = { id: eventBinId }; return s; });
@@ -288,11 +334,26 @@ export function useTournament(eventId) {
   return {
     state, teams, playersOfTeam, getStats, playerName,
     addPlayer, deletePlayer,
+    saveGroups, generateBracket, updateBracketMatch, moveBracketMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, activateSync, pushNow,
     exportBackup, importBackup,
     setModal
   };
+}
+
+function buildBracketMatches(groupA, groupB) {
+  const groupMatches = (teams, phase) => teams.flatMap((teamA, index) =>
+    teams.slice(index + 1).map(teamB => ({ id: uid(), phase, teamA, teamB, scheduledAt: '', status: 'scheduled' }))
+  );
+  return [
+    ...groupMatches(groupA, 'Grupo A'),
+    ...groupMatches(groupB, 'Grupo B'),
+    { id: uid(), phase: 'Semifinal 1', teamA: '1º Grupo A', teamB: '2º Grupo B', scheduledAt: '', status: 'scheduled' },
+    { id: uid(), phase: 'Semifinal 2', teamA: '1º Grupo B', teamB: '2º Grupo A', scheduledAt: '', status: 'scheduled' },
+    { id: uid(), phase: '3º lugar', teamA: 'Perdedor SF1', teamB: 'Perdedor SF2', scheduledAt: '', status: 'scheduled' },
+    { id: uid(), phase: 'Final', teamA: 'Vencedor SF1', teamB: 'Vencedor SF2', scheduledAt: '', status: 'scheduled' }
+  ];
 }
 
 function snapshotMatch(match) {
