@@ -121,6 +121,14 @@ export default function Jogo({ t }) {
             </button>
           ))}
         </div>
+        <button
+          className="btn btn-ghost btn-block"
+          style={{ marginTop: 12 }}
+          disabled={!m.undoStack || m.undoStack.length === 0}
+          onClick={t.undoLastPoint}
+        >
+          ↶ Voltar último ponto
+        </button>
       </div>
 
       <div className="card">

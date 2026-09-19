@@ -86,7 +86,7 @@ export function useTournament(eventId) {
   /* ---------- Jogo ao vivo ---------- */
   function startMatch({ teamA, teamB, bestOf, target }) {
     update(s => {
-      s.current = { teamA, teamB, bestOf, target, sets: [], setsWonA: 0, setsWonB: 0, currentSet: { a: 0, b: 0 }, log: [], matchStats: {} };
+      s.current = { teamA, teamB, bestOf, target, sets: [], setsWonA: 0, setsWonB: 0, currentSet: { a: 0, b: 0 }, log: [], matchStats: {}, undoStack: [] };
       return s;
     });
   }
@@ -101,6 +101,17 @@ export function useTournament(eventId) {
       const m = s.current;
       const ev = EVENT_TYPES[evtKey];
       const scoringTeam = ev.point === 'self' ? playerTeam : (playerTeam === m.teamA ? m.teamB : m.teamA);
+      m.undoStack ||= [];
+
+      // Guarda o estado do placar antes do lance. Isso também permite desfazer
+      // o último ponto quando ele encerrou um set ou a partida.
+      m.undoStack.push({
+        match: snapshotMatch(m),
+        playerId,
+        stat: ev.stat,
+        addsPoint: ev.point === 'self',
+        receiverId: null
+      });
 
       if (!s.playerStats[playerId]) s.playerStats[playerId] = emptyStats();
       if (!m.matchStats[playerId]) m.matchStats[playerId] = emptyStats();
@@ -128,15 +139,44 @@ export function useTournament(eventId) {
 
   function chooseReceiver(receiverId) {
     update(s => {
+      const m = s.current;
       if (receiverId) {
         if (!s.playerStats[receiverId]) s.playerStats[receiverId] = emptyStats();
-        if (!s.current.matchStats[receiverId]) s.current.matchStats[receiverId] = emptyStats();
+        if (!m.matchStats[receiverId]) m.matchStats[receiverId] = emptyStats();
         s.playerStats[receiverId].mishits += 1;
-        s.current.matchStats[receiverId].mishits += 1;
+        m.matchStats[receiverId].mishits += 1;
+        const lastPoint = m.undoStack[m.undoStack.length - 1];
+        if (lastPoint) lastPoint.receiverId = receiverId;
       }
       checkSetEnd(s);
       return s;
     });
+  }
+
+  function undoLastPoint() {
+    if (!state.current || !state.current.undoStack || state.current.undoStack.length === 0) {
+      toast('Nenhum ponto para voltar neste jogo.');
+      return;
+    }
+    update(s => {
+      const m = s.current;
+      const lastPoint = m.undoStack.pop();
+
+      decrementStat(s.playerStats[lastPoint.playerId], lastPoint.stat);
+      decrementStat(m.matchStats[lastPoint.playerId], lastPoint.stat);
+      if (lastPoint.addsPoint) {
+        decrementStat(s.playerStats[lastPoint.playerId], 'points');
+        decrementStat(m.matchStats[lastPoint.playerId], 'points');
+      }
+      if (lastPoint.receiverId) {
+        decrementStat(s.playerStats[lastPoint.receiverId], 'mishits');
+        decrementStat(m.matchStats[lastPoint.receiverId], 'mishits');
+      }
+
+      Object.assign(m, lastPoint.match);
+      return s;
+    });
+    toast('Último ponto removido e estatísticas atualizadas.');
   }
 
   function checkSetEnd(s) {
@@ -227,11 +267,27 @@ export function useTournament(eventId) {
   return {
     state, teams, playersOfTeam, getStats, playerName,
     addPlayer, deletePlayer,
-    startMatch, cancelMatch, registerEvent, chooseReceiver, finalizeMatch,
+    startMatch, cancelMatch, registerEvent, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, activateSync, pushNow,
     exportBackup, importBackup,
     setModal
   };
+}
+
+function snapshotMatch(match) {
+  return {
+    sets: structuredClone(match.sets),
+    setsWonA: match.setsWonA,
+    setsWonB: match.setsWonB,
+    currentSet: structuredClone(match.currentSet),
+    log: structuredClone(match.log),
+    finished: Boolean(match.finished),
+    winner: match.winner || null
+  };
+}
+
+function decrementStat(stats, key) {
+  if (stats && stats[key] > 0) stats[key] -= 1;
 }
 
 function currentEventName(eventId) {
