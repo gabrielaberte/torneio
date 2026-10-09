@@ -214,6 +214,35 @@ export function useTournament(eventId) {
       return s;
     });
   }
+  function generateGroupPhase() {
+    update(s => {
+      const eligible = [...new Set(s.teamEntries || s.roster.map(p => p.team).filter(Boolean))].filter(team => s.roster.filter(p => p.team === team && p.registrationValid !== false).length === 6);
+      if (eligible.length !== 6) return s;
+      s.bracket = { groupTeams: eligible, matches: eligible.flatMap((a, i) => eligible.slice(i + 1).map(b => ({ id: uid(), phase: 'Fase de grupos', teamA: a, teamB: b, scheduledAt: '', status: 'scheduled', bestOf: 3 }))) };
+      return s;
+    });
+  }
+  const groupStandings = useMemo(() => calculateGroupStandings((state.bracket && state.bracket.groupTeams) || [], (state.bracket && state.bracket.matches) || []), [state.bracket]);
+  function generateDoubleElimination(firstChoiceRank) {
+    update(s => {
+      const ranking = calculateGroupStandings((s.bracket && s.bracket.groupTeams) || [], (s.bracket && s.bracket.matches) || []);
+      if (ranking.length !== 6 || ranking.some(row => !row.finished)) return s;
+      const pick = ranking.find(row => row.rank === firstChoiceRank);
+      const other = ranking.find(row => row.rank === (firstChoiceRank === 3 ? 4 : 3));
+      const first = ranking[0], second = ranking[1], fifth = ranking[4], sixth = ranking[5];
+      const elimination = [
+        { id: uid(), phase: 'Upper R1', teamA: first.name, teamB: pick.name, scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), phase: 'Upper R1', teamA: second.name, teamB: other.name, scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), phase: 'Upper Final', teamA: 'Vencedor Upper 1', teamB: 'Vencedor Upper 2', scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), phase: 'Lower R1', teamA: sixth.name, teamB: 'Perdedor Upper 1', scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), phase: 'Lower R1', teamA: fifth.name, teamB: 'Perdedor Upper 2', scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), phase: 'Lower R2', teamA: 'Vencedor Lower 1', teamB: 'Vencedor Lower 2', scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), phase: 'Lower Final', teamA: 'Vencedor Lower R2', teamB: 'Perdedor Upper Final', scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), phase: 'Grande Final', teamA: 'Vencedor Upper Final', teamB: 'Vencedor Lower Final', scheduledAt: '', status: 'scheduled', bestOf: 3 }
+      ];
+      s.bracket.matches.push(...elimination); return s;
+    });
+  }
   function updateBracketMatch(id, changes) {
     update(s => {
       const bracket = s.bracket || { groupA: [], groupB: [], matches: [] };
@@ -327,6 +356,7 @@ export function useTournament(eventId) {
       s.standings[m.winner] = (s.standings[m.winner] || 0) + 1;
       const mvpName = (s.roster.find(p => p.id === mvpId) || {}).name || '—';
       s.history.push({ teamA: m.teamA, teamB: m.teamB, sets: m.sets, setsWonA: m.setsWonA, setsWonB: m.setsWonB, winner: m.winner, mvpName });
+      if (m.bracketMatchId && s.bracket && s.bracket.matches) s.bracket.matches = s.bracket.matches.map(match => match.id === m.bracketMatchId ? { ...match, status: 'done', winner: m.winner, setsWonA: m.setsWonA, setsWonB: m.setsWonB, sets: m.sets } : match);
       if (m.bracketMatchId && s.bracket && s.bracket.matches) {
         s.bracket.matches = s.bracket.matches.map(match => match.id === m.bracketMatchId ? { ...match, status: 'done' } : match);
       }
@@ -399,7 +429,7 @@ export function useTournament(eventId) {
   return {
     state, teams, eligibleTeams, playersOfTeam, getStats, playerName, isTeamEligible,
     addPlayer, updatePlayer, deletePlayer, addTeam, deleteTeam, assignPlayerToTeam,
-    saveGroups, generateBracket, updateBracketMatch, moveBracketMatch,
+    saveGroups, generateBracket, generateGroupPhase, generateDoubleElimination, groupStandings, updateBracketMatch, moveBracketMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, publicationPending, activateSync, pushNow,
     exportBackup, importBackup,
@@ -419,6 +449,20 @@ function buildBracketMatches(groupA, groupB) {
     { id: uid(), phase: '3º lugar', teamA: 'Perdedor SF1', teamB: 'Perdedor SF2', scheduledAt: '', status: 'scheduled' },
     { id: uid(), phase: 'Final', teamA: 'Vencedor SF1', teamB: 'Vencedor SF2', scheduledAt: '', status: 'scheduled' }
   ];
+}
+
+function calculateGroupStandings(teams, matches) {
+  const rows = Object.fromEntries(teams.map(name => [name, { name, points: 0, wins: 0, pointDiff: 0, head: {}, played: 0 }]));
+  matches.filter(match => match.phase === 'Fase de grupos' && match.status === 'done' && match.winner).forEach(match => {
+    const a = rows[match.teamA], b = rows[match.teamB]; if (!a || !b) return;
+    const aWon = match.winner === match.teamA, loserSets = aWon ? match.setsWonB : match.setsWonA;
+    const winner = aWon ? a : b, loser = aWon ? b : a;
+    winner.points += loserSets === 0 ? 3 : 2; loser.points += loserSets === 1 ? 1 : 0; winner.wins += 1; a.played += 1; b.played += 1;
+    (match.sets || []).forEach(set => { a.pointDiff += set.a - set.b; b.pointDiff += set.b - set.a; });
+    winner.head[loser.name] = (winner.head[loser.name] || 0) + 1;
+  });
+  const allPlayed = matches.filter(match => match.phase === 'Fase de grupos').length;
+  return Object.values(rows).sort((a, b) => b.points - a.points || b.wins - a.wins || (b.head[a.name] || 0) - (a.head[b.name] || 0) || b.pointDiff - a.pointDiff || a.name.localeCompare(b.name)).map((row, i) => ({ ...row, rank: i + 1, finished: row.played === teams.length - 1 && allPlayed > 0 }));
 }
 
 function snapshotMatch(match) {

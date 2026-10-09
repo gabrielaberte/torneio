@@ -8,7 +8,7 @@ import Jogo from './Jogo';
 import Stats from './Stats';
 import Times from './Times';
 import Historico from './Historico';
-import Chaveamento from './Chaveamento';
+import Formato2Fases from './Formato2Fases';
 
 const TABS = [
   ['elenco', 'Elenco'],
@@ -44,7 +44,7 @@ export default function AdminApp({ eventId, onSwitchEvent, onSwitchRole }) {
         {tab === 'jogo' && <Jogo t={t} />}
         {tab === 'stats' && <Stats t={t} />}
         {tab === 'times' && <Times t={t} />}
-        {tab === 'chaveamento' && <Chaveamento t={t} />}
+        {tab === 'chaveamento' && <Formato2Fases t={t} />}
         {tab === 'historico' && <Historico t={t} eventName={eventName} />}
       </div>
     </>
