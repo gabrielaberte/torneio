@@ -72,6 +72,7 @@ export default function Jogo({ t }) {
         )}
         <button className="btn btn-primary btn-block" style={{ marginTop: 16 }} onClick={() => {
           if (teamA === teamB) { toast('Escolha times diferentes'); return; }
+          if (!t.isTeamEligible(teamA) || !t.isTeamEligible(teamB)) { toast('Cada time precisa ter exatamente 6 jogadores com inscrição válida para jogar.'); return; }
           const target = targetSel === 'custom' ? parseInt(customTarget, 10) : parseInt(targetSel, 10);
           if (!target || target < 1) { toast('Informe um número válido de pontos por set'); return; }
           t.startMatch({ teamA, teamB, bestOf, target, bracketMatchId: bracketMatchId || null });

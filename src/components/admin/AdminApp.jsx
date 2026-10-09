@@ -3,7 +3,7 @@ import React from 'react';
 import { useState } from 'react';
 import { getEvents } from '../../lib/storage';
 import { useTournament } from '../../hooks/useTournament';
-import Elenco from './Elenco';
+import Cadastro from './Cadastro';
 import Jogo from './Jogo';
 import Stats from './Stats';
 import Times from './Times';
@@ -40,7 +40,7 @@ export default function AdminApp({ eventId, onSwitchEvent, onSwitchRole }) {
         ))}
       </div>
       <div className="content">
-        {tab === 'elenco' && <Elenco t={t} />}
+        {tab === 'elenco' && <Cadastro t={t} />}
         {tab === 'jogo' && <Jogo t={t} />}
         {tab === 'stats' && <Stats t={t} />}
         {tab === 'times' && <Times t={t} />}

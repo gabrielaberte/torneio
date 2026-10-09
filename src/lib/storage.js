@@ -3,6 +3,7 @@ import { uid } from './constants';
 export function defaultState() {
   return {
     roster: [],
+    teamEntries: [],
     playerStats: {},
     standings: {},
     history: [],

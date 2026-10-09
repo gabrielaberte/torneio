@@ -69,9 +69,15 @@ export function useTournament(eventId) {
   }
 
   const teams = useMemo(() => {
-    const set = new Set(state.roster.map(p => p.team).filter(Boolean));
+    const set = new Set([...(state.teamEntries || []), ...state.roster.map(p => p.team)].filter(Boolean));
     return Array.from(set).sort();
-  }, [state.roster]);
+  }, [state.roster, state.teamEntries]);
+
+  function isRegistrationValid(player) { return player.registrationValid !== false; }
+  function isTeamEligible(team) {
+    return state.roster.filter(player => player.team === team && isRegistrationValid(player)).length === 6;
+  }
+  const eligibleTeams = useMemo(() => teams.filter(isTeamEligible), [teams, state.roster]);
 
   function playersOfTeam(team) {
     return state.roster.filter(p => p.team === team);
@@ -85,8 +91,19 @@ export function useTournament(eventId) {
   }
 
   /* ---------- Elenco ---------- */
-  function addPlayer({ name, team, gender }) {
-    update(s => { s.roster.push({ id: uid(), name, team, gender }); return s; });
+  function addPlayer({ name, gender, registrationValid = false }) {
+    update(s => { s.roster.push({ id: uid(), name, team: '', gender, registrationValid }); return s; });
+  }
+  function updatePlayer(id, changes) {
+    update(s => {
+      s.roster = s.roster.map(player => {
+        if (player.id !== id) return player;
+        const next = { ...player, ...changes };
+        if (next.registrationValid === false) next.team = '';
+        return next;
+      });
+      return s;
+    });
   }
   function deletePlayer(id) {
     update(s => {
@@ -157,6 +174,31 @@ export function useTournament(eventId) {
       return s;
     });
     return askReceiver ? { askReceiver } : {};
+  }
+  function addTeam(name) {
+    update(s => {
+      const cleaned = name.trim();
+      s.teamEntries ||= [];
+      if (cleaned && !s.teamEntries.includes(cleaned)) s.teamEntries.push(cleaned);
+      return s;
+    });
+  }
+  function deleteTeam(name) {
+    update(s => {
+      s.teamEntries = (s.teamEntries || []).filter(team => team !== name);
+      s.roster = s.roster.map(player => player.team === name ? { ...player, team: '' } : player);
+      return s;
+    });
+  }
+  function assignPlayerToTeam(playerId, team) {
+    update(s => {
+      const player = s.roster.find(item => item.id === playerId);
+      if (!player || player.registrationValid === false) return s;
+      const validPlayers = s.roster.filter(item => item.team === team && item.registrationValid !== false && item.id !== playerId);
+      if (team && validPlayers.length >= 6) return s;
+      player.team = team;
+      return s;
+    });
   }
 
   /* ---------- Chaveamento e agenda ---------- */
@@ -355,8 +397,8 @@ export function useTournament(eventId) {
   function setModal(modal) { update(s => { s.modal = modal; return s; }); }
 
   return {
-    state, teams, playersOfTeam, getStats, playerName,
-    addPlayer, deletePlayer,
+    state, teams, eligibleTeams, playersOfTeam, getStats, playerName, isTeamEligible,
+    addPlayer, updatePlayer, deletePlayer, addTeam, deleteTeam, assignPlayerToTeam,
     saveGroups, generateBracket, updateBracketMatch, moveBracketMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, publicationPending, activateSync, pushNow,
