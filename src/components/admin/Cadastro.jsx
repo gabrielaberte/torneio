@@ -8,6 +8,10 @@ const AWARD_FIELDS = [
   ['bestAttack', 'Melhor ataque'], ['topScorer', 'Maior pontuador'], ['bestBlocker', 'Melhor bloqueio']
 ];
 const PODIUM_FIELDS = [['first', '1º lugar'], ['second', '2º lugar'], ['third', '3º lugar']];
+const POT_COLORS = ['#d9e6f2', '#b9d9c8', '#f5dfa2', '#efc1a6', '#d8c1e8'];
+function comparePlayersByPot(a, b) {
+  return (Number.isInteger(a.pot) ? a.pot : 5) - (Number.isInteger(b.pot) ? b.pot : 5);
+}
 
 export default function Cadastro({ t }) {
   const toast = useToast();
@@ -44,8 +48,29 @@ export default function Cadastro({ t }) {
 }
 
 function Players({ t, query, onQueryChange, onNew, onEdit, onImport }) {
+  const toast = useToast();
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkPot, setBulkPot] = useState('');
   const normalizedQuery = normalizePlayerName(query);
-  const filteredPlayers = t.state.roster.filter(player => normalizePlayerName(player.name).includes(normalizedQuery));
+  const filteredPlayers = t.state.roster.filter(player => normalizePlayerName(player.name).includes(normalizedQuery)).sort(comparePlayersByPot);
+  const allVisibleSelected = filteredPlayers.length > 0 && filteredPlayers.every(player => selectedIds.includes(player.id));
+  function togglePlayer(id) {
+    setSelectedIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  }
+  function toggleVisible() {
+    setSelectedIds(current => allVisibleSelected
+      ? current.filter(id => !filteredPlayers.some(player => player.id === id))
+      : [...new Set([...current, ...filteredPlayers.map(player => player.id)])]);
+  }
+  function applyBulkPot() {
+    if (!selectedIds.length) return toast('Selecione pelo menos um jogador.');
+    if (bulkPot === '') return toast('Escolha o pote a aplicar.');
+    const pot = bulkPot === '__none__' ? null : Number(bulkPot);
+    selectedIds.forEach(id => t.updatePlayer(id, { pot }));
+    toast(`Pote atualizado para ${selectedIds.length} jogador(es).`);
+    setSelectedIds([]);
+    setBulkPot('');
+  }
   return <>
     <div className="card">
       <h3>Cadastro de jogadores</h3>
@@ -55,8 +80,18 @@ function Players({ t, query, onQueryChange, onNew, onEdit, onImport }) {
       <label htmlFor="roster-name-filter">Buscar jogador por nome</label>
       <input id="roster-name-filter" type="text" value={query} onChange={event => onQueryChange(event.target.value)} placeholder="Digite o nome do jogador" />
       {query && <div className="muted" style={{ marginTop: 7 }}>{filteredPlayers.length} de {t.state.roster.length} jogadores encontrados</div>}
+      {t.state.roster.length > 0 && <button type="button" className="btn btn-ghost btn-block" style={{ marginTop: 9 }} onClick={toggleVisible}>{allVisibleSelected ? 'Desmarcar jogadores visíveis' : 'Selecionar jogadores visíveis'}</button>}
+      {selectedIds.length > 0 && <div className="bulk-pot-controls">
+        <div className="muted">{selectedIds.length} selecionado(s)</div>
+        <select aria-label="Pote para aplicar aos jogadores selecionados" value={bulkPot} onChange={event => setBulkPot(event.target.value)}>
+          <option value="">Escolha o pote</option>
+          {[0, 1, 2, 3, 4].map(pot => <option value={String(pot)} key={pot}>Pote {pot}</option>)}
+          <option value="__none__">Remover pote</option>
+        </select>
+        <button type="button" className="btn btn-navy btn-block" onClick={applyBulkPot}>Aplicar aos selecionados</button>
+      </div>}
     </div>
-    {t.state.roster.length === 0 ? <div className="empty">Nenhum jogador cadastrado.</div> : filteredPlayers.length === 0 ? <div className="empty">Nenhum jogador encontrado com esse nome.</div> : <div className="player-list">{filteredPlayers.map(p => <div className="card player-card" key={p.id}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><div><b>{p.name}</b> <span className={`gender-badge ${p.gender}`}>{p.gender}</span><div className="muted" style={{ marginTop: 4 }}>{p.registrationValid === false ? 'Inscrição pendente' : 'Inscrição válida'} · {p.team || 'Sem time'}</div><div className="muted" style={{ marginTop: 4 }}>{p.pot === undefined || p.pot === null ? 'Pote não informado' : `Pote ${p.pot}`}{p.isCaptain ? ' · Capitã' : ''}</div></div><button className="btn btn-ghost" onClick={() => onEdit(p)}>Editar</button></div></div>)}</div>}
+    {t.state.roster.length === 0 ? <div className="empty">Nenhum jogador cadastrado.</div> : filteredPlayers.length === 0 ? <div className="empty">Nenhum jogador encontrado com esse nome.</div> : <div className="player-list">{filteredPlayers.map(p => <div className="card player-card" key={p.id} style={{ backgroundColor: Number.isInteger(p.pot) && POT_COLORS[p.pot] ? POT_COLORS[p.pot] : '#fff' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, minWidth: 0 }}><input type="checkbox" aria-label={`Selecionar ${p.name}`} checked={selectedIds.includes(p.id)} onChange={() => togglePlayer(p.id)} style={{ width: 'auto', marginTop: 4 }} /><div style={{ minWidth: 0 }}><b>{p.name}</b> <span className={`gender-badge ${p.gender}`}>{p.gender}</span><div className="muted" style={{ marginTop: 4 }}>{p.registrationValid === false ? 'Inscrição pendente' : 'Inscrição válida'} · {p.team || 'Sem time'}</div><div className="muted" style={{ marginTop: 4 }}>{p.pot === undefined || p.pot === null ? 'Pote não informado' : `Pote ${p.pot}`}{p.isCaptain ? ' · Capitã' : ''}</div></div></div><button className="btn btn-ghost" onClick={() => onEdit(p)}>Editar</button></div></div>)}</div>}
   </>;
 }
 
@@ -146,7 +181,28 @@ function PlayerImportPreview({ t, roster, onClose }) {
   </div>;
 }
 
-function Teams({ t, name, setName, onAdd, onSelect, onRename }) { return <><div className="card"><h3>Cadastrar time</h3><input value={name} onChange={e => setName(e.target.value)} placeholder="Nome do time" /><button className="btn btn-primary btn-block" style={{ marginTop: 12 }} onClick={onAdd}>+ Criar time</button></div>{t.teams.length === 0 ? <div className="empty">Cadastre um time para montar sua equipe.</div> : t.teams.map(team => { const count = t.playersOfTeam(team).filter(p => p.registrationValid !== false).length; return <div className="card" key={team}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><h3>{team}</h3><button className="btn btn-ghost btn-sm" onClick={() => onRename(team)}>Editar nome</button></div><div className="muted" style={{ marginBottom: 10 }}>{count}/6 jogadores com inscrição válida {count === 6 ? '· apto para jogar' : '· não apto para jogar'}</div><button className="btn btn-ghost btn-block" onClick={() => onSelect(team)}>Escolher jogadores</button></div>; })}</>; }
+function Teams({ t, name, setName, onAdd, onSelect, onRename }) {
+  return <>
+    <div className="card team-create-card">
+      <h3>Cadastrar time</h3>
+      <div className="team-create-controls"><input value={name} onChange={event => setName(event.target.value)} placeholder="Nome do time" /><button className="btn btn-primary" onClick={onAdd}>+ Criar time</button></div>
+    </div>
+    {t.teams.length === 0 ? <div className="empty">Cadastre um time para montar sua equipe.</div> : <div className="teams-grid">
+      {t.teams.map(team => {
+        const members = t.playersOfTeam(team).filter(player => player.registrationValid !== false);
+        const count = members.length;
+        return <div className="card team-summary-card" key={team}>
+          <div className="team-summary-heading"><h3>{team}</h3><button className="btn btn-ghost btn-sm" onClick={() => onRename(team)}>Renomear</button></div>
+          <div className="team-member-chips">
+            {members.map(player => <span key={player.id} style={{ backgroundColor: Number.isInteger(player.pot) && POT_COLORS[player.pot] ? POT_COLORS[player.pot] : '#f1f3f4' }}>{player.name}{Number.isInteger(player.pot) ? ` · P${player.pot}` : ''}</span>)}
+            {count === 0 && <span className="muted">Nenhum jogador válido</span>}
+          </div>
+          <div className="team-summary-footer"><span className={count === 6 ? 'team-ready' : 'team-not-ready'}>{count}/6 · {count === 6 ? 'Apto para jogar' : 'Não apto'}</span><button className="btn btn-navy btn-sm" onClick={() => onSelect(team)}>Editar seleção</button></div>
+        </div>;
+      })}
+    </div>}
+  </>;
+}
 
 function PlayerForm({ player, onClose, onSave }) {
   const [name, setName] = useState(player.name || '');
@@ -240,30 +296,45 @@ function PlayerForm({ player, onClose, onSave }) {
 function TeamForm({ team, t, onClose }) {
   const toast = useToast();
   const [query, setQuery] = useState('');
+  const [potFilter, setPotFilter] = useState('all');
   const members = t.playersOfTeam(team).filter(player => player.registrationValid !== false);
   const eligiblePlayers = t.state.roster.filter(player => player.registrationValid !== false);
-  const filteredPlayers = eligiblePlayers.filter(player => normalizePlayerName(player.name).includes(normalizePlayerName(query)));
+  const filteredPlayers = eligiblePlayers.filter(player => {
+    const matchesName = normalizePlayerName(player.name).includes(normalizePlayerName(query));
+    const matchesPot = potFilter === 'all'
+      || (potFilter === '__none__' && (player.pot === undefined || player.pot === null))
+      || String(player.pot) === potFilter;
+    return matchesName && matchesPot;
+  }).sort(comparePlayersByPot);
 
   function change(player) {
     if (player.team === team) return t.assignPlayerToTeam(player.id, '');
+    if (player.team) return toast(`Este jogador está no time ${player.team}. Para realocá-lo, remova-o pela seleção desse time.`);
     if (members.length >= 6) return toast('O time já possui 6 jogadores válidos.');
     t.assignPlayerToTeam(player.id, team);
   }
 
   return <div className="overlay" onClick={onClose}>
-    <div className="modal" onClick={event => event.stopPropagation()}>
+    <div className="modal team-picker-modal" onClick={event => event.stopPropagation()}>
       <button className="modal-close" aria-label="Fechar seleção de jogadores" onClick={onClose}>×</button>
       <h3>{team}</h3>
-      <div className="modal-sub">Escolha até 6 jogadores com inscrição válida. Ao selecionar alguém de outro time, ele será transferido.</div>
-      <label htmlFor="team-player-filter">Buscar jogador por nome</label>
-      <input id="team-player-filter" type="text" value={query} onChange={event => setQuery(event.target.value)} placeholder="Digite o nome do jogador" />
+      <div className="modal-sub">Escolha até 6 jogadores com inscrição válida. Para realocar alguém, remova primeiro pela seleção do time atual.</div>
+      <div className="team-picker-controls">
+        <div><label htmlFor="team-player-filter">Buscar jogador</label><input id="team-player-filter" type="text" value={query} onChange={event => setQuery(event.target.value)} placeholder="Digite um nome" /></div>
+        <div><label htmlFor="team-player-pot-filter">Pote de habilidade</label><select id="team-player-pot-filter" value={potFilter} onChange={event => setPotFilter(event.target.value)}>
+          <option value="all">Todos os potes</option>
+          {[0, 1, 2, 3, 4].map(pot => <option value={String(pot)} key={pot}>Pote {pot}</option>)}
+          {eligiblePlayers.some(player => player.pot === undefined || player.pot === null) && <option value="__none__">Sem pote</option>}
+        </select></div>
+      </div>
       <div className="muted" style={{ margin: '8px 0' }}>{filteredPlayers.length} de {eligiblePlayers.length} jogadores encontrados · {members.length}/6 no time</div>
       <div className="pick-list">
-        {filteredPlayers.map(player => <label className="pick-row" key={player.id}>
-          <span><input type="checkbox" checked={player.team === team} onChange={() => change(player)} style={{ width: 'auto', marginRight: 8 }} />{player.name}</span>
+        {filteredPlayers.map(player => <label className="pick-row" key={player.id} style={{ backgroundColor: Number.isInteger(player.pot) && POT_COLORS[player.pot] ? POT_COLORS[player.pot] : '#fff' }}>
+          <span className="pick-player-name"><input type="checkbox" checked={player.team === team} disabled={Boolean(player.team && player.team !== team)} onChange={() => change(player)} style={{ width: 'auto', marginRight: 7 }} />{player.name}</span>
+          <span className="pick-pot-tag">{Number.isInteger(player.pot) ? `Pote ${player.pot}` : 'Sem pote'}</span>
           <span className="team-tag">{player.team && player.team !== team ? player.team : ''}</span>
         </label>)}
-        {filteredPlayers.length === 0 && <div className="empty">Nenhum jogador encontrado com esse nome.</div>}
+        {filteredPlayers.length === 0 && <div className="empty">Nenhum jogador encontrado com os filtros selecionados.</div>}
       </div>
       <button className="btn btn-danger btn-block" style={{ marginTop: 14 }} onClick={() => { if (confirm('Excluir ' + team + '? Os jogadores ficarão sem time.')) { t.deleteTeam(team); onClose(); } }}>Excluir time</button>
     </div>

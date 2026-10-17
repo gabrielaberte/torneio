@@ -250,7 +250,7 @@ function ScoutingView({ snapshot, tournamentId }) {
       || player.potColor === colorFilter;
     const playerId = playerKey(player, players.indexOf(player));
     const matchesFavorites = filter !== 'favorites' || favorites.includes(playerId);
-    const matchesFavoriteAvailable = filter !== 'favorites-available' || (favorites.includes(playerId) && !playerTeam);
+    const matchesFavoriteAvailable = filter !== 'favorites-available' || (favorites.includes(playerId) && !playerTeam && Boolean(player.potColor));
     return matchesFilter && matchesFavorites && matchesFavoriteAvailable && matchesTeam && matchesColor && String(player.name || '').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'));
   });
 
@@ -291,7 +291,11 @@ function ScoutingView({ snapshot, tournamentId }) {
             return (
               <article className={`scouting-card${player.potColor ? '' : ' scouting-card-no-pot'}`} style={player.potColor ? { backgroundColor: player.potColor } : undefined} key={playerId}>
                 <div className="scouting-card-heading"><h3>{player.name || 'Atleta'}</h3><button type="button" className={`scouting-favorite${isFavorite ? ' active' : ''}`} aria-pressed={isFavorite} aria-label={isFavorite ? `Remover ${player.name} dos favoritos` : `Favoritar ${player.name}`} onClick={() => toggleFavorite(playerId)}>{isFavorite ? '★' : '☆'}</button>{player.isCaptain && <span className="scouting-captain">Capitão/ã</span>}</div>
-                {String(player.team || '').trim() ? <div className="scouting-team">Já associado ao time: {player.team}</div> : <div className="scouting-available">Disponível para o draft</div>}
+                {String(player.team || '').trim()
+                  ? <div className="scouting-team">Já associado ao time: {player.team}</div>
+                  : player.potColor
+                    ? <div className="scouting-available">Disponível para o draft</div>
+                    : <div className="scouting-unavailable">Não disponível para o draft</div>}
                 {podiums.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Pódios</span><div className="scouting-counts">{podiums.map(([key, medal, label]) => <span className="scouting-count scouting-medal" key={key} title={label} aria-label={`${label}: ${player.podiums[key]}`}><span aria-hidden="true">{medal}</span>{player.podiums[key] > 1 && <b>×{player.podiums[key]}</b>}</span>)}</div></div>}
                 {awards.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Premiações</span><div className="scouting-counts">{awards.map(([key, label]) => <span className="scouting-count" key={key}>{label} <b>{player.awards[key]}</b></span>)}</div></div>}
                 {podiums.length === 0 && awards.length === 0 && <div className="scouting-no-history">Sem histórico registrado</div>}
