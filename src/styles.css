@@ -151,8 +151,10 @@ table.stat-table td{text-align:center; padding:7px 3px; border-top:1px solid var
 .scouting-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px;}
 .scouting-card{min-width:0; padding:10px; border:1px solid rgba(15,42,61,.16); border-radius:12px; box-shadow:0 1px 0 var(--line); color:var(--navy);}
 .scouting-card-no-pot{background:var(--white); border-style:dashed;}
-.scouting-card-heading{display:flex; align-items:flex-start; justify-content:space-between; gap:4px; flex-wrap:wrap;}
+.scouting-card-heading{display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap;}
 .scouting-card-heading h3{min-width:0; flex:1; font-size:15px; overflow-wrap:anywhere; margin:0;}
+.scouting-avatar{width:38px; height:38px; flex:none; display:grid; place-items:center; overflow:hidden; border-radius:50%; background:rgba(15,42,61,.12); color:var(--navy); font-size:15px; font-weight:800;}
+.scouting-avatar img{width:100%; height:100%; object-fit:cover;}
 .scouting-favorite{flex:none; padding:2px 5px; border:1px solid rgba(15,42,61,.24); border-radius:7px; background:rgba(255,255,255,.72); color:var(--navy); font:inherit; font-size:16px; line-height:1.2; cursor:pointer;}
 .scouting-favorite.active{background:#fff2bf; border-color:#c58b00; color:#704d00;}
 .scouting-available{display:inline-block; margin-top:7px; padding:4px 8px; border-radius:20px; background:rgba(255,255,255,.75); color:#315b3b; font-size:11px; font-weight:800;}
@@ -171,6 +173,8 @@ table.stat-table td{text-align:center; padding:7px 3px; border-top:1px solid var
 
 .player-list{display:grid; grid-template-columns:1fr; gap:0;}
 .player-card{min-width:0;}
+.player-photo-controls{display:flex; align-items:center; gap:10px; margin-top:8px;}
+.player-photo-preview{width:56px; height:56px; border-radius:50%; object-fit:cover; border:2px solid var(--line);}
 .team-create-controls{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; margin-top:8px;}
 .team-create-controls input[type=text]{padding:9px 10px; font-size:14px;}
 .teams-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;}

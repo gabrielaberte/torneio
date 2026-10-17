@@ -18,6 +18,7 @@ function projectScoutingPlayer(player) {
   return {
     id: String(player.id || ''),
     name: String(player.name || ''),
+    photo: typeof player.photo === 'string' ? player.photo : '',
     team: String(player.team || ''),
     isCaptain: player.isCaptain === true,
     potColor: Number.isInteger(player.pot) && player.pot >= 0 && player.pot <= 4 ? POT_COLORS[player.pot] : null,

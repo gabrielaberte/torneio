@@ -13,6 +13,30 @@ function comparePlayersByPot(a, b) {
   return (Number.isInteger(a.pot) ? a.pot : 5) - (Number.isInteger(b.pot) ? b.pot : 5);
 }
 
+function compressPlayerPhoto(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) return reject(new Error('Selecione um arquivo de imagem.'));
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const maxSize = 160;
+      const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d');
+      if (!context) { URL.revokeObjectURL(objectUrl); reject(new Error('Não foi possível processar a imagem.')); return; }
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(objectUrl);
+      resolve(canvas.toDataURL('image/jpeg', 0.68));
+    };
+    image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Não foi possível abrir essa imagem.')); };
+    image.src = objectUrl;
+  });
+}
+
 export default function Cadastro({ t }) {
   const toast = useToast();
   const [view, setView] = useState('players');
@@ -206,6 +230,8 @@ function Teams({ t, name, setName, onAdd, onSelect, onRename }) {
 
 function PlayerForm({ player, onClose, onSave }) {
   const [name, setName] = useState(player.name || '');
+  const [photo, setPhoto] = useState(player.photo || '');
+  const [photoLoading, setPhotoLoading] = useState(false);
   const [gender, setGender] = useState(player.gender || (player.id ? '' : 'M'));
   const [valid, setValid] = useState(player.registrationValid !== false);
   const [pot, setPot] = useState(player.pot == null ? '' : String(player.pot));
@@ -220,6 +246,15 @@ function PlayerForm({ player, onClose, onSave }) {
     return [key, value == null ? '' : String(value)];
   })));
 
+  async function handlePhotoChange(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    setPhotoLoading(true);
+    try { setPhoto(await compressPlayerPhoto(file)); setError(''); }
+    catch (error) { setError(error.message || 'Não foi possível processar a imagem.'); }
+    finally { setPhotoLoading(false); event.target.value = ''; }
+  }
+
   function submit() {
     if (!name.trim()) { setError('Informe o nome do atleta.'); return; }
     if ((gender && !['M', 'F'].includes(gender)) || (!player.id && !gender)) { setError('Selecione um gênero válido.'); return; }
@@ -231,7 +266,7 @@ function PlayerForm({ player, onClose, onSave }) {
     const invalidCount = allCounts.find(([, value]) => value !== '' && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))));
     if (invalidCount) { setError('Premiações e pódios devem ser inteiros não negativos ou ficar em branco.'); return; }
 
-    const data = { name: name.trim(), registrationValid: valid, isCaptain };
+    const data = { name: name.trim(), photo, registrationValid: valid, isCaptain };
     if (['M', 'F'].includes(gender)) data.gender = gender;
     if (pot !== '') data.pot = Number(pot);
     else if (player.pot != null) data.pot = null;
@@ -269,6 +304,13 @@ function PlayerForm({ player, onClose, onSave }) {
       </select>
       <label htmlFor="player-pot">Pote (opcional, 0 a 4)</label>
       <input id="player-pot" type="number" inputMode="numeric" min="0" max="4" step="1" value={pot} aria-invalid={pot !== '' && (!/^\d+$/.test(pot) || Number(pot) > 4)} onChange={e => setPot(e.target.value)} />
+      <label htmlFor="player-photo">Foto do participante (opcional)</label>
+      <input id="player-photo" type="file" accept="image/*" onChange={handlePhotoChange} disabled={photoLoading} />
+      <div className="player-photo-controls">
+        {photo ? <img className="player-photo-preview" src={photo} alt={`Foto de ${name || 'participante'}`} /> : <span className="muted">Sem foto cadastrada</span>}
+        {photo && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPhoto('')}>Remover foto</button>}
+        {photoLoading && <span className="muted">Processando foto…</span>}
+      </div>
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
         <input type="checkbox" checked={isCaptain} onChange={e => setIsCaptain(e.target.checked)} style={{ width: 'auto' }} />
         Capitã nesta edição
@@ -288,7 +330,7 @@ function PlayerForm({ player, onClose, onSave }) {
         </div>)}
       </fieldset>
       {error && <div role="alert" className="muted" style={{ color: '#a21b1b', marginTop: 10 }}>{error}</div>}
-      <button className="btn btn-primary btn-block" style={{ marginTop: 16 }} onClick={submit}>Salvar</button>
+      <button className="btn btn-primary btn-block" style={{ marginTop: 16 }} onClick={submit} disabled={photoLoading}>{photoLoading ? 'Processando foto…' : 'Salvar'}</button>
     </div>
   </div>;
 }
