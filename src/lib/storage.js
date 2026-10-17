@@ -45,6 +45,11 @@ export function getEvents() {
 export function saveEvents(list) {
   localStorage.setItem('volei_events', JSON.stringify(list));
 }
+export function renameEventEntry(id, name) {
+  const events = getEvents().map(event => event.id === id ? { ...event, name } : event);
+  saveEvents(events);
+  return events;
+}
 export function createEventEntry(name) {
   const events = getEvents();
   const id = uid();

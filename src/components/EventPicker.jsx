@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { getEvents, createEventEntry, deleteEventEntry, setCurrentEventId, normalizeEventState } from '../lib/storage';
+import { getEvents, createEventEntry, deleteEventEntry, renameEventEntry, setCurrentEventId, normalizeEventState } from '../lib/storage';
 import { checkAdminSession, importSyncedEvent, loginAdmin } from '../lib/cloud';
 import { uid } from '../lib/constants';
 import { useToast } from './ui/Toast';
@@ -20,6 +20,16 @@ export default function EventPicker({ onOpenEvent, onSwitchRole }) {
     onOpenEvent(id);
   }
   function open(id) { setCurrentEventId(id); onOpenEvent(id); }
+  function rename(id) {
+    const event = getEvents().find(item => item.id === id);
+    if (!event) return;
+    const nextName = window.prompt('Novo nome do torneio:', event.name);
+    if (nextName === null) return;
+    if (!nextName.trim()) { toast('Dê um nome para o torneio'); return; }
+    renameEventEntry(id, nextName.trim());
+    refresh();
+    toast('Nome do torneio atualizado.');
+  }
   function remove(id) {
     if (confirm('Isso vai apagar todos os dados desse torneio. Tem certeza?')) {
       deleteEventEntry(id);
@@ -56,7 +66,7 @@ export default function EventPicker({ onOpenEvent, onSwitchRole }) {
       {events.length === 0 ? <div className="empty"><div className="big">🏐</div>Nenhum torneio cadastrado ainda.</div> : events.map(ev => (
         <div key={ev.id} className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div><div style={{ fontWeight: 800, fontSize: 15 }}>{ev.name}</div><div className="muted">Criado em {new Date(ev.createdAt).toLocaleDateString('pt-BR')}</div></div>
-          <div style={{ display: 'flex', gap: 6 }}><button className="btn btn-sm btn-navy" onClick={() => open(ev.id)}>Abrir</button><button className="icon-btn" onClick={() => remove(ev.id)}>×</button></div>
+          <div style={{ display: 'flex', gap: 6 }}><button className="btn btn-sm btn-navy" onClick={() => open(ev.id)}>Abrir</button><button className="btn btn-sm btn-ghost" onClick={() => rename(ev.id)}>Mudar nome</button><button className="icon-btn" onClick={() => remove(ev.id)}>×</button></div>
         </div>
       ))}
       <div className="card">

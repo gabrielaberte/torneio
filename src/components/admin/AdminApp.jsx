@@ -1,8 +1,7 @@
-import React from 'react';
-
-import { useState } from 'react';
-import { getEvents } from '../../lib/storage';
+import React, { useState } from 'react';
+import { getEvents, renameEventEntry } from '../../lib/storage';
 import { useTournament } from '../../hooks/useTournament';
+import { useToast } from '../ui/Toast';
 import Cadastro from './Cadastro';
 import Jogo from './Jogo';
 import Stats from './Stats';
@@ -21,15 +20,26 @@ const TABS = [
 
 export default function AdminApp({ eventId, onSwitchEvent, onSwitchRole }) {
   const [tab, setTab] = useState('elenco');
+  const [eventName, setEventName] = useState(() => (getEvents().find(e => e.id === eventId) || {}).name || 'Torneio');
+  const toast = useToast();
   const t = useTournament(eventId);
-  const eventName = (getEvents().find(e => e.id === eventId) || {}).name || 'Torneio';
+
+  function renameTournament() {
+    const name = window.prompt('Novo nome do torneio:', eventName);
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) { toast('Dê um nome para o torneio'); return; }
+    renameEventEntry(eventId, trimmed);
+    setEventName(trimmed);
+    toast('Nome do torneio atualizado.');
+  }
 
   return (
     <>
       <div className="topbar">
         <div className="brand"><div className="ball" /><h1>Torneio de Maluco</h1></div>
         <div className="sub">
-          <span onClick={onSwitchEvent}>{eventName} · trocar torneio ↺</span>
+          <span>{eventName}</span>{' '}<button className="btn btn-sm btn-ghost" onClick={renameTournament}>Mudar nome</button>{' '}<span onClick={onSwitchEvent}>· trocar torneio ↺</span>
           {' '}|{' '}
           <span onClick={onSwitchRole}>trocar modo</span>
         </div>
