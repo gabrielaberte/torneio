@@ -55,6 +55,7 @@ export function createEventEntry(name) {
 export function deleteEventEntry(id) {
   saveEvents(getEvents().filter(e => e.id !== id));
   localStorage.removeItem('volei_state_' + id);
+  localStorage.removeItem('volei_sync_pending_' + id);
 }
 
 /* ---------- Estado de cada torneio ---------- */
@@ -109,6 +110,10 @@ export function markPublicationPending(eventId) {
 export function clearPendingPublication(eventId) {
   localStorage.setItem('volei_pending_publications', JSON.stringify(getPendingPublicationIds().filter(id => id !== eventId)));
 }
+
+export function isSyncPending(eventId) { return localStorage.getItem('volei_sync_pending_' + eventId) === '1'; }
+export function markSyncPending(eventId) { localStorage.setItem('volei_sync_pending_' + eventId, '1'); }
+export function clearSyncPending(eventId) { localStorage.removeItem('volei_sync_pending_' + eventId); }
 
 /* ---------- Backup manual (texto) ---------- */
 export function exportBackupText(eventName, state) {

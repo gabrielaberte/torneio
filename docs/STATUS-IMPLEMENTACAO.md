@@ -8,8 +8,8 @@
 | 4 — Persistência da importação | Concluída |
 | 5 — Backups e publicação | Implementação concluída (variáveis de ambiente necessárias no deploy) |
 | 6 — Cadastro manual | Implementação concluída (validação manual pendente) |
-| 7 — Testes de persistência, sincronização e uso offline | Não iniciada |
-| 8 — Cards públicos de scouting | Não iniciada |
+| 7 — Testes de persistência, sincronização e uso offline | Em andamento (checks locais/build passaram; browser e rede pendentes) |
+| 8 — Cards públicos de scouting | Implementação concluída (validação manual pendente) |
 
 ## Registro por etapa
 
@@ -66,6 +66,14 @@
 - Verificação: `npm run build` passou; cenários interativos de criar/editar não foram executados.
 - Pendências: Validar manualmente campos opcionais, limites, preservação e atleta legado; testes de persistência/sync continuam na Etapa 7.
 - Arquivos envolvidos: `src/components/admin/Cadastro.jsx`, `src/hooks/useTournament.js`, `src/styles.css`.
+
+### Etapa 7 — Testes de persistência, sincronização e uso offline
+
+- Status: Em andamento; execução parcial local/build, validações reais em browser/rede pendentes.
+- Verificação: Smoke Node confirmou persistência simulada, compatibilidade legada, serialização de backup, fila pendente e parsing Excel. `npm run build` passou; service worker precacheia 6 entradas e exclui `/api/` do fallback.
+- Ajuste: Sync privada offline agora persiste marca pendente por torneio e tenta reenviar ao reconectar; falha no envio mantém a marca para retry.
+- Limitações: Login foi confirmado pela usuária; publicação real, reload offline, round-trip entre aparelhos, restauração pela UI e conflito concorrente não foram exercitados. Escritas concorrentes permanecem last-write-wins sem comparação atômica.
+- Matriz, passos e evidências: `docs/etapa-07-testes-offline.md`.
 ## Registro por etapa futura
 
 Copie esta seção para cada etapa iniciada:
@@ -78,4 +86,13 @@ Copie esta seção para cada etapa iniciada:
 - Testes executados e resultados:
 - Pendências e dúvidas:
 - Arquivos envolvidos:
+
+### Etapa 8 — Cards públicos de scouting
+
+- Status: Implementação concluída; testes manuais em navegador ainda pendentes.
+- Decisões: A aba pública usa exclusivamente `snapshot.scoutingPlayers`; os filtros de pódios/premiações consideram contagens positivas, enquanto cards mostram valores explicitamente registrados, inclusive zero. Pote aparece apenas pela cor enviada na projeção pública; pote ausente usa card neutro tracejado.
+- Alterações realizadas: Aba Scouting no visualizador público, busca por nome, filtros Todos/Capitães/Com pódios/Com premiações, cards responsivos e mensagens para carregamento, lista vazia, busca sem resultado e ausência de histórico.
+- Testes executados e resultados: `npm run build` passou; não foram executados testes automatizados ou inspeção visual no navegador nesta etapa.
+- Pendências e dúvidas: Conferir manualmente busca, cada filtro, atletas sem histórico/pote, potes de 0 a 4, responsividade e payload publicado em mobile/desktop. Etapa 7 continua com validações reais de browser/rede pendentes.
+- Arquivos envolvidos: `src/components/public/PublicViewer.jsx`, `src/styles.css`, `src/lib/cloud.js` (projeção pública já existente), `docs/etapa-08-cards-scouting.md`.
 

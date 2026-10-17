@@ -23,3 +23,11 @@ Busca, cada filtro, atleta sem histórico, atleta sem pote, pote em cada faixa, 
 
 ## O que não deve ser feito
 Não mostrar pote numericamente, criar filtro/legenda de pote ou inferir estatísticas ausentes.
+
+## Execução
+- Implementado em `PublicViewer.jsx`: aba pública com busca por nome e filtros Todos, Capitães, com pódios e com premiações.
+- Cards exibem capitã, pódios e premiações publicadas. Contagens registradas como zero são preservadas na exibição; sem histórico fica indicado discretamente.
+- Cor do card vem de `potColor` já derivada na allowlist de `cloud.js`; pote ausente usa fundo neutro tracejado. Nenhum valor ou rótulo de pote é exibido.
+- CSS adapta a lista a uma ou duas colunas conforme a largura disponível.
+- Validação pendente: busca/filtros, campos ausentes, todas as faixas de pote, inspeção do payload, mobile e desktop em navegador real.
+- A Etapa 7 permanece em andamento e não foi marcada como concluída.

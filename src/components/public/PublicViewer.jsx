@@ -62,11 +62,12 @@ export default function PublicViewer({ onSwitchRole }) {
       {screen === 'tournament' ? (
         <>
           <div className="tabs">
-            <div className={`tab ${tab === 'times' ? 'active' : ''}`} onClick={() => setTab('times')}>Classificação</div>
-            <div className={`tab ${tab === 'jogos' ? 'active' : ''}`} onClick={() => setTab('jogos')}>Próximos jogos</div>
+            <button type="button" className={`tab ${tab === 'times' ? 'active' : ''}`} onClick={() => setTab('times')}>Classificação</button>
+            <button type="button" className={`tab ${tab === 'jogos' ? 'active' : ''}`} onClick={() => setTab('jogos')}>Próximos jogos</button>
+            <button type="button" className={`tab ${tab === 'scouting' ? 'active' : ''}`} onClick={() => setTab('scouting')}>Scouting</button>
           </div>
           <div className="content">
-            {tab === 'times' ? <StandingsView snapshot={snapshot} /> : <ScheduleView snapshot={snapshot} />}
+            {tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} />}
           </div>
         </>
       ) : (
@@ -161,4 +162,57 @@ function ScheduleView({ snapshot }) {
   );
   /* legacy placeholder */
   return <div className="empty"><div className="big">📅</div>A tabela de próximos jogos ainda está sendo preparada.<br />Em breve você vai ver aqui os horários e confrontos.</div>;
+}
+
+const AWARD_LABELS = [
+  ['mvp', 'MVP'], ['bestServer', 'Melhor sacador'], ['bestDefense', 'Melhor defesa'],
+  ['bestAttack', 'Melhor ataque'], ['topScorer', 'Maior pontuador'], ['bestBlocker', 'Melhor bloqueio']
+];
+const PODIUM_LABELS = [['first', '1º lugar'], ['second', '2º lugar'], ['third', '3º lugar']];
+
+function ScoutingView({ snapshot }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const players = snapshot && Array.isArray(snapshot.scoutingPlayers) ? snapshot.scoutingPlayers : [];
+  const filtered = players.filter(player => {
+    const awards = player.awards || {};
+    const podiums = player.podiums || {};
+    const hasAwards = Object.values(awards).some(value => Number.isInteger(value) && value > 0);
+    const hasPodiums = Object.values(podiums).some(value => Number.isInteger(value) && value > 0);
+    const matchesFilter = filter === 'all'
+      || (filter === 'captains' && player.isCaptain)
+      || (filter === 'podiums' && hasPodiums)
+      || (filter === 'awards' && hasAwards);
+    return matchesFilter && String(player.name || '').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'));
+  });
+
+  if (!snapshot) return <div className="empty">Carregando dados de scouting…</div>;
+  if (players.length === 0) return <div className="empty"><div className="big">🏐</div>Este torneio ainda não tem atletas publicados para scouting.</div>;
+
+  const filters = [['all', 'Todos'], ['captains', 'Capitães'], ['podiums', 'Com pódios'], ['awards', 'Com premiações']];
+  return (
+    <>
+      <label htmlFor="scouting-search">Buscar atleta</label>
+      <input id="scouting-search" type="text" value={query} onChange={event => setQuery(event.target.value)} placeholder="Digite um nome" />
+      <div className="scouting-filters" role="group" aria-label="Filtrar atletas">
+        {filters.map(([value, label]) => <button type="button" key={value} className={`btn btn-sm ${filter === value ? 'btn-navy' : 'btn-ghost'}`} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}
+      </div>
+      {filtered.length === 0 ? <div className="empty">Nenhum atleta encontrado com esses critérios.</div> : (
+        <div className="scouting-grid">
+          {filtered.map((player, index) => {
+            const awards = AWARD_LABELS.filter(([key]) => Number.isInteger(player.awards && player.awards[key]) && player.awards[key] >= 0);
+            const podiums = PODIUM_LABELS.filter(([key]) => Number.isInteger(player.podiums && player.podiums[key]) && player.podiums[key] >= 0);
+            return (
+              <article className={`scouting-card${player.potColor ? '' : ' scouting-card-no-pot'}`} style={player.potColor ? { backgroundColor: player.potColor } : undefined} key={`${player.name}-${index}`}>
+                <div className="scouting-card-heading"><h3>{player.name || 'Atleta'}</h3>{player.isCaptain && <span className="scouting-captain">Capitão/ã</span>}</div>
+                {podiums.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Pódios</span><div className="scouting-counts">{podiums.map(([key, label]) => <span className="scouting-count" key={key}>{label} <b>{player.podiums[key]}</b></span>)}</div></div>}
+                {awards.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Premiações</span><div className="scouting-counts">{awards.map(([key, label]) => <span className="scouting-count" key={key}>{label} <b>{player.awards[key]}</b></span>)}</div></div>}
+                {podiums.length === 0 && awards.length === 0 && <div className="scouting-no-history">Sem histórico registrado</div>}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
 }

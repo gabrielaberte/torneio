@@ -3,7 +3,8 @@ import { EVENT_TYPES, emptyStats, uid } from '../lib/constants';
 import {
   defaultState, loadEventState, saveEventState, getEvents, normalizeEventState,
   getRegistryId, setRegistryId, getViewerUrl,
-  getPendingPublicationIds, markPublicationPending, clearPendingPublication
+  getPendingPublicationIds, markPublicationPending, clearPendingPublication,
+  isSyncPending, markSyncPending, clearSyncPending
 } from '../lib/storage';
 import { publishSnapshot as cloudPublish, activateSync as cloudActivateSync, pushCloud, pullCloud } from '../lib/cloud';
 import { useToast } from '../components/ui/Toast';
@@ -15,6 +16,26 @@ export function useTournament(eventId) {
   const [publicationPending, setPublicationPending] = useState(() => getPendingPublicationIds().includes(eventId));
   const syncTimer = useRef(null);
   const loadedFor = useRef(eventId);
+  const latestState = useRef(state);
+
+  useEffect(() => { latestState.current = state; }, [state]);
+
+  useEffect(() => {
+    async function retryPendingSync() {
+      if (!eventId || !navigator.onLine || !isSyncPending(eventId)) return;
+      const current = loadedFor.current === eventId ? latestState.current : loadEventState(eventId);
+      if (!current.sync || !current.sync.binId) return;
+      const saved = await pushCloud(current.sync.binId, currentEventName(eventId), {
+        ...current,
+        updatedAt: new Date().toISOString()
+      });
+      if (saved) clearSyncPending(eventId);
+      else markSyncPending(eventId);
+    }
+    window.addEventListener('online', retryPendingSync);
+    if (navigator.onLine && isSyncPending(eventId)) retryPendingSync();
+    return () => window.removeEventListener('online', retryPendingSync);
+  }, [eventId, state.sync.binId]);
 
   // troca de torneio -> recarrega estado local e tenta puxar versÃ£o mais nova da nuvem
   useEffect(() => {
@@ -51,12 +72,17 @@ export function useTournament(eventId) {
   useEffect(() => {
     if (!eventId) return;
     const updatedAt = saveEventState(eventId, state);
+    if (state.sync.binId && !navigator.onLine) markSyncPending(eventId);
     if (state.sync.binId && navigator.onLine) {
       clearTimeout(syncTimer.current);
       syncTimer.current = setTimeout(() => {
-        pushCloud(state.sync.binId, currentEventName(eventId), { ...state, updatedAt });
+        pushCloud(state.sync.binId, currentEventName(eventId), { ...state, updatedAt }).then(saved => {
+          if (saved) clearSyncPending(eventId);
+          else markSyncPending(eventId);
+        });
       }, 4000);
     }
+    return () => clearTimeout(syncTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, eventId]);
 
@@ -472,7 +498,12 @@ export function useTournament(eventId) {
 
   async function pushNow() {
     if (!state.sync.binId) { toast('Ative a sincronização primeiro'); return; }
-    const saved = await pushCloud(state.sync.binId, currentEventName(eventId), state);
+    const saved = await pushCloud(state.sync.binId, currentEventName(eventId), {
+      ...state,
+      updatedAt: new Date().toISOString()
+    });
+    if (saved) clearSyncPending(eventId);
+    else markSyncPending(eventId);
     toast(saved ? 'Sincronizado com a nuvem' : 'Falha ao sincronizar. Entre no acesso administrativo e tente novamente.');
   }
 
