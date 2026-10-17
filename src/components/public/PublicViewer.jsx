@@ -212,6 +212,15 @@ function ScoutingView({ snapshot, tournamentId }) {
   });
   const players = snapshot && Array.isArray(snapshot.scoutingPlayers) ? snapshot.scoutingPlayers : [];
   const playerKey = (player, index) => player.id || `${player.name || 'atleta'}-${index}`;
+  const orderedPlayers = filter === 'all'
+    ? [...players].sort((a, b) => {
+        const colorRank = color => {
+          const rank = SCOUTING_COLORS.findIndex(([value]) => value === color);
+          return rank < 0 ? SCOUTING_COLORS.length : rank;
+        };
+        return colorRank(a.potColor) - colorRank(b.potColor);
+      })
+    : players;
   function toggleFavorite(id) {
     setFavorites(current => {
       const next = current.includes(id) ? current.filter(item => item !== id) : [...current, id];
@@ -221,7 +230,7 @@ function ScoutingView({ snapshot, tournamentId }) {
   }
   const teamNames = Array.from(new Set(players.map(player => String(player.team || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const hasUnassignedPlayers = players.some(player => !String(player.team || '').trim());
-  const filtered = players.filter(player => {
+  const filtered = orderedPlayers.filter(player => {
     const awards = player.awards || {};
     const podiums = player.podiums || {};
     const hasAwards = Object.values(awards).some(value => Number.isInteger(value) && value > 0);
