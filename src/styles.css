@@ -52,9 +52,9 @@ button{font-family:inherit; cursor:pointer;}
 
 label{display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:rgba(15,42,61,.6); margin:12px 0 6px;}
 label:first-child{margin-top:0;}
-input[type=text], input[type=password], select{width:100%; padding:11px 12px; border-radius:9px; border:1.5px solid var(--line); font-size:15px; background:#fff; font-family:inherit; color:var(--ink);}
+input[type=text], input[type=password], input[type=number], select{width:100%; padding:11px 12px; border-radius:9px; border:1.5px solid var(--line); font-size:15px; background:#fff; font-family:inherit; color:var(--ink);}
 .gender-row{display:flex; gap:8px;}
-.gender-opt{flex:1; text-align:center; padding:10px; border-radius:9px; border:1.5px solid var(--line); font-weight:700; font-size:13px; background:#fff; cursor:pointer;}
+.gender-opt{flex:1; text-align:center; padding:10px; border-radius:9px; border:1.5px solid var(--line); font-family:inherit; font-weight:700; font-size:13px; background:#fff; color:var(--ink); cursor:pointer;}
 .gender-opt.selected-M{background:var(--navy); color:#fff; border-color:var(--navy);}
 .gender-opt.selected-F{background:var(--coral); color:#fff; border-color:var(--coral);}
 

@@ -90,14 +90,31 @@ export function useTournament(eventId) {
   }
 
   /* ---------- Elenco ---------- */
-  function addPlayer({ name, gender, registrationValid = false }) {
-    update(s => { s.roster.push({ id: uid(), name, team: '', gender, registrationValid }); return s; });
+  function addPlayer(data) {
+    update(s => {
+      s.roster.push({
+        id: uid(),
+        team: '',
+        ...data,
+        registrationValid: typeof data.registrationValid === 'boolean' ? data.registrationValid : false
+      });
+      return s;
+    });
   }
   function updatePlayer(id, changes) {
     update(s => {
       s.roster = s.roster.map(player => {
         if (player.id !== id) return player;
         const next = { ...player, ...changes };
+        if (changes.scoutingHistory && typeof changes.scoutingHistory === 'object') {
+          const previous = player.scoutingHistory || {};
+          next.scoutingHistory = {
+            ...previous,
+            ...changes.scoutingHistory,
+            awards: { ...(previous.awards || {}), ...(changes.scoutingHistory.awards || {}) },
+            podiums: { ...(previous.podiums || {}), ...(changes.scoutingHistory.podiums || {}) }
+          };
+        }
         if (next.registrationValid === false) next.team = '';
         return next;
       });

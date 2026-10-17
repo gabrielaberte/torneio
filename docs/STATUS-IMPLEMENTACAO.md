@@ -7,7 +7,7 @@
 | 3 — Importação e validação de Excel | Concluída |
 | 4 — Persistência da importação | Concluída |
 | 5 — Backups e publicação | Implementação concluída (variáveis de ambiente necessárias no deploy) |
-| 6 — Cadastro manual | Não iniciada |
+| 6 — Cadastro manual | Implementação concluída (validação manual pendente) |
 | 7 — Testes de persistência, sincronização e uso offline | Não iniciada |
 | 8 — Cards públicos de scouting | Não iniciada |
 
@@ -57,6 +57,15 @@
 - Verificação: `npm run build` passou; sem chamadas reais à Vercel/JSONBin ou round-trip de backup.
 - Pendências: Configurar `JSONBIN_MASTER_KEY`, `VOLEI_ADMIN_PASSWORD` (mínimo 8 caracteres) e `VOLEI_SESSION_SECRET` (mínimo 32 caracteres) na Vercel; validar as Functions e fluxos com sessão na etapa 7.
 - Arquivos envolvidos: src/lib/storage.js, src/lib/cloud.js, src/hooks/useTournament.js, src/components/EventPicker.jsx, src/components/admin/Historico.jsx, src/App.jsx, api/admin-auth.js, api/jsonbin.js, server/adminAuth.js e docs/etapa-05-backup-publicacao.md.
+
+### Etapa 6 — Cadastro manual
+
+- Status: Implementação concluída; validação manual dos fluxos pendente.
+- Decisões: Campos opcionais em branco representam dado não informado; zero é armazenado explicitamente; apagar um valor existente grava `null`.
+- Alterações realizadas: Formulário existente ampliado para gênero, inscrição, pote, capitã, premiações e pódios; atualização parcial preserva ID, time, estatísticas e histórico não editado.
+- Verificação: `npm run build` passou; cenários interativos de criar/editar não foram executados.
+- Pendências: Validar manualmente campos opcionais, limites, preservação e atleta legado; testes de persistência/sync continuam na Etapa 7.
+- Arquivos envolvidos: `src/components/admin/Cadastro.jsx`, `src/hooks/useTournament.js`, `src/styles.css`.
 ## Registro por etapa futura
 
 Copie esta seção para cada etapa iniciada:

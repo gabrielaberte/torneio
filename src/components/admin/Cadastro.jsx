@@ -3,6 +3,12 @@ import { GENDERS } from '../../lib/constants';
 import { parsePlayerWorkbook } from '../../lib/playerImport';
 import { useToast } from '../ui/Toast';
 
+const AWARD_FIELDS = [
+  ['mvp', 'MVP'], ['bestServer', 'Melhor sacador'], ['bestDefense', 'Melhor defesa'],
+  ['bestAttack', 'Melhor ataque'], ['topScorer', 'Maior pontuador'], ['bestBlocker', 'Melhor bloqueio']
+];
+const PODIUM_FIELDS = [['first', '1º lugar'], ['second', '2º lugar'], ['third', '3º lugar']];
+
 export default function Cadastro({ t }) {
   const toast = useToast();
   const [view, setView] = useState('players');
@@ -10,12 +16,22 @@ export default function Cadastro({ t }) {
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [teamName, setTeamName] = useState('');
   const [showImport, setShowImport] = useState(false);
-  function save(data) { if (!data.name.trim()) return toast('Informe o nome.'); if (player.id) t.updatePlayer(player.id, data); else t.addPlayer(data); setPlayer(null); }
+  function save(data) {
+    if (!data.name.trim()) { toast('Informe o nome.'); return; }
+    if ((data.gender !== undefined && !['M', 'F'].includes(data.gender)) || (!player.id && !data.gender) || typeof data.registrationValid !== 'boolean') { toast('Confira gênero e situação da inscrição.'); return; }
+    if (Object.prototype.hasOwnProperty.call(data, 'pot') && data.pot !== null && (!Number.isInteger(data.pot) || data.pot < 0 || data.pot > 4)) { toast('Pote: informe um inteiro de 0 a 4.'); return; }
+    const history = data.scoutingHistory || {};
+    for (const value of [...Object.values(history.awards || {}), ...Object.values(history.podiums || {})]) {
+      if (value !== null && (!Number.isInteger(value) || value < 0)) { toast('Premiações e pódios devem ser inteiros não negativos.'); return; }
+    }
+    if (player.id) t.updatePlayer(player.id, data); else t.addPlayer(data);
+    setPlayer(null);
+  }
   function addTeam() { const name = teamName.trim(); if (!name) return toast('Informe o nome do time.'); if (t.teams.includes(name)) return toast('Este time já existe.'); t.addTeam(name); setTeamName(''); }
   return <>
     <div className="tabs"><div className={`tab ${view === 'players' ? 'active' : ''}`} onClick={() => setView('players')}>Jogadores</div><div className={`tab ${view === 'teams' ? 'active' : ''}`} onClick={() => setView('teams')}>Times</div></div>
-    {view === 'players' ? <Players t={t} onNew={() => setPlayer({ id: null, name: '', gender: 'M', registrationValid: false })} onEdit={setPlayer} onImport={() => setShowImport(true)} /> : <Teams t={t} name={teamName} setName={setTeamName} onAdd={addTeam} onSelect={setSelectedTeam} />}
-    {showImport && <PlayerImportPreview roster={t.state.roster} onClose={() => setShowImport(false)} />}
+    {view === 'players' ? <Players t={t} onNew={() => setPlayer({ id: null, name: '', gender: 'M', registrationValid: false, isCaptain: false })} onEdit={setPlayer} onImport={() => setShowImport(true)} /> : <Teams t={t} name={teamName} setName={setTeamName} onAdd={addTeam} onSelect={setSelectedTeam} />}
+    {showImport && <PlayerImportPreview t={t} roster={t.state.roster} onClose={() => setShowImport(false)} />}
     {player && <PlayerForm player={player} onClose={() => setPlayer(null)} onSave={save} />}
     {selectedTeam && <TeamForm team={selectedTeam} t={t} onClose={() => setSelectedTeam(null)} />}
   </>;
@@ -29,7 +45,7 @@ function Players({ t, onNew, onEdit, onImport }) {
       <button className="btn btn-primary btn-block" onClick={onNew}>+ Cadastrar jogador</button>
       <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={onImport}>Importar planilha Excel · prévia</button>
     </div>
-    {t.state.roster.length === 0 ? <div className="empty">Nenhum jogador cadastrado.</div> : t.state.roster.map(p => <div className="card" key={p.id}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><div><b>{p.name}</b> <span className={`gender-badge ${p.gender}`}>{p.gender}</span><div className="muted" style={{ marginTop: 4 }}>{p.registrationValid === false ? 'Inscrição pendente' : 'Inscrição válida'} · {p.team || 'Sem time'}</div></div><button className="btn btn-ghost" onClick={() => onEdit(p)}>Editar</button></div></div>)}
+    {t.state.roster.length === 0 ? <div className="empty">Nenhum jogador cadastrado.</div> : t.state.roster.map(p => <div className="card" key={p.id}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><div><b>{p.name}</b> <span className={`gender-badge ${p.gender}`}>{p.gender}</span><div className="muted" style={{ marginTop: 4 }}>{p.registrationValid === false ? 'Inscrição pendente' : 'Inscrição válida'} · {p.team || 'Sem time'}</div><div className="muted" style={{ marginTop: 4 }}>{p.pot === undefined || p.pot === null ? 'Pote não informado' : `Pote ${p.pot}`}{p.isCaptain ? ' · Capitã' : ''}</div></div><button className="btn btn-ghost" onClick={() => onEdit(p)}>Editar</button></div></div>)}
   </>;
 }
 
@@ -121,7 +137,94 @@ function PlayerImportPreview({ t, roster, onClose }) {
 
 function Teams({ t, name, setName, onAdd, onSelect }) { return <><div className="card"><h3>Cadastrar time</h3><input value={name} onChange={e => setName(e.target.value)} placeholder="Nome do time" /><button className="btn btn-primary btn-block" style={{ marginTop: 12 }} onClick={onAdd}>+ Criar time</button></div>{t.teams.length === 0 ? <div className="empty">Cadastre um time para montar sua equipe.</div> : t.teams.map(team => { const count = t.playersOfTeam(team).filter(p => p.registrationValid !== false).length; return <div className="card" key={team}><h3>{team}</h3><div className="muted" style={{ marginBottom: 10 }}>{count}/6 jogadores com inscrição válida {count === 6 ? '· apto para jogar' : '· não apto para jogar'}</div><button className="btn btn-ghost btn-block" onClick={() => onSelect(team)}>Escolher jogadores</button></div>; })}</>; }
 
-function PlayerForm({ player, onClose, onSave }) { const [name, setName] = useState(player.name); const [gender, setGender] = useState(player.gender); const [valid, setValid] = useState(player.registrationValid !== false); return <div className="overlay" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button><h3>{player.id ? 'Editar jogador' : 'Novo jogador'}</h3><label>Nome</label><input value={name} onChange={e => setName(e.target.value)} /><label>Sexo</label><div className="gender-row"><div className={`gender-opt ${gender === 'M' ? 'selected-M' : ''}`} onClick={() => setGender('M')}>{GENDERS.M}</div><div className={`gender-opt ${gender === 'F' ? 'selected-F' : ''}`} onClick={() => setGender('F')}>{GENDERS.F}</div></div><label>Inscrição</label><select value={valid ? 'yes' : 'no'} onChange={e => setValid(e.target.value === 'yes')}><option value="no">Não validada / pendente</option><option value="yes">Válida (pagamento confirmado)</option></select><button className="btn btn-primary btn-block" style={{ marginTop: 16 }} onClick={() => onSave({ name: name.trim(), gender, registrationValid: valid })}>Salvar</button></div></div>; }
+function PlayerForm({ player, onClose, onSave }) {
+  const [name, setName] = useState(player.name || '');
+  const [gender, setGender] = useState(player.gender || (player.id ? '' : 'M'));
+  const [valid, setValid] = useState(player.registrationValid !== false);
+  const [pot, setPot] = useState(player.pot == null ? '' : String(player.pot));
+  const [isCaptain, setIsCaptain] = useState(player.isCaptain === true);
+  const [error, setError] = useState('');
+  const [awards, setAwards] = useState(() => Object.fromEntries(AWARD_FIELDS.map(([key]) => {
+    const value = player.scoutingHistory && player.scoutingHistory.awards && player.scoutingHistory.awards[key];
+    return [key, value == null ? '' : String(value)];
+  })));
+  const [podiums, setPodiums] = useState(() => Object.fromEntries(PODIUM_FIELDS.map(([key]) => {
+    const value = player.scoutingHistory && player.scoutingHistory.podiums && player.scoutingHistory.podiums[key];
+    return [key, value == null ? '' : String(value)];
+  })));
+
+  function submit() {
+    if (!name.trim()) { setError('Informe o nome do atleta.'); return; }
+    if ((gender && !['M', 'F'].includes(gender)) || (!player.id && !gender)) { setError('Selecione um gênero válido.'); return; }
+    if (pot !== '' && (!/^\d+$/.test(pot) || Number(pot) < 0 || Number(pot) > 4)) {
+      setError('Pote: informe um inteiro de 0 a 4 ou deixe em branco.');
+      return;
+    }
+    const allCounts = [...Object.entries(awards), ...Object.entries(podiums)];
+    const invalidCount = allCounts.find(([, value]) => value !== '' && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))));
+    if (invalidCount) { setError('Premiações e pódios devem ser inteiros não negativos ou ficar em branco.'); return; }
+
+    const data = { name: name.trim(), registrationValid: valid, isCaptain };
+    if (['M', 'F'].includes(gender)) data.gender = gender;
+    if (pot !== '') data.pot = Number(pot);
+    else if (player.pot != null) data.pot = null;
+    const history = { awards: {}, podiums: {} };
+    Object.entries(awards).forEach(([key, value]) => {
+      const previous = player.scoutingHistory && player.scoutingHistory.awards && player.scoutingHistory.awards[key];
+      if (value !== '') history.awards[key] = Number(value);
+      else if (previous != null) history.awards[key] = null;
+    });
+    Object.entries(podiums).forEach(([key, value]) => {
+      const previous = player.scoutingHistory && player.scoutingHistory.podiums && player.scoutingHistory.podiums[key];
+      if (value !== '') history.podiums[key] = Number(value);
+      else if (previous != null) history.podiums[key] = null;
+    });
+    if (Object.keys(history.awards).length || Object.keys(history.podiums).length) data.scoutingHistory = history;
+    setError('');
+    onSave(data);
+  }
+
+  return <div className="overlay" onClick={onClose}>
+    <div className="modal" onClick={e => e.stopPropagation()}>
+      <button className="modal-close" aria-label="Fechar cadastro" onClick={onClose}>×</button>
+      <h3>{player.id ? 'Editar jogador' : 'Novo jogador'}</h3>
+      <label htmlFor="player-name">Nome</label>
+      <input id="player-name" value={name} onChange={e => setName(e.target.value)} required />
+      <label>Gênero</label>
+      <div className="gender-row" role="group" aria-label="Gênero">
+        <button type="button" className={`gender-opt ${gender === 'M' ? 'selected-M' : ''}`} aria-pressed={gender === 'M'} onClick={() => setGender('M')}>{GENDERS.M}</button>
+        <button type="button" className={`gender-opt ${gender === 'F' ? 'selected-F' : ''}`} aria-pressed={gender === 'F'} onClick={() => setGender('F')}>{GENDERS.F}</button>
+      </div>
+      <label htmlFor="player-registration">Inscrição</label>
+      <select id="player-registration" value={valid ? 'yes' : 'no'} onChange={e => setValid(e.target.value === 'yes')}>
+        <option value="no">Não validada / pendente</option>
+        <option value="yes">Válida (pagamento confirmado)</option>
+      </select>
+      <label htmlFor="player-pot">Pote (opcional, 0 a 4)</label>
+      <input id="player-pot" type="number" inputMode="numeric" min="0" max="4" step="1" value={pot} aria-invalid={pot !== '' && (!/^\d+$/.test(pot) || Number(pot) > 4)} onChange={e => setPot(e.target.value)} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+        <input type="checkbox" checked={isCaptain} onChange={e => setIsCaptain(e.target.checked)} style={{ width: 'auto' }} />
+        Capitã nesta edição
+      </label>
+      <fieldset style={{ marginTop: 14 }}>
+        <legend>Premiações históricas (opcionais)</legend>
+        {AWARD_FIELDS.map(([key, label]) => <div key={key}>
+          <label htmlFor={`award-${key}`}>{label}</label>
+          <input id={`award-${key}`} type="number" inputMode="numeric" min="0" step="1" placeholder="Não informado" value={awards[key]} aria-invalid={awards[key] !== '' && (!/^\d+$/.test(awards[key]) || !Number.isSafeInteger(Number(awards[key])))} onChange={e => setAwards(current => ({ ...current, [key]: e.target.value }))} />
+        </div>)}
+      </fieldset>
+      <fieldset style={{ marginTop: 14 }}>
+        <legend>Pódios históricos (opcionais)</legend>
+        {PODIUM_FIELDS.map(([key, label]) => <div key={key}>
+          <label htmlFor={`podium-${key}`}>{label}</label>
+          <input id={`podium-${key}`} type="number" inputMode="numeric" min="0" step="1" placeholder="Não informado" value={podiums[key]} aria-invalid={podiums[key] !== '' && (!/^\d+$/.test(podiums[key]) || !Number.isSafeInteger(Number(podiums[key])))} onChange={e => setPodiums(current => ({ ...current, [key]: e.target.value }))} />
+        </div>)}
+      </fieldset>
+      {error && <div role="alert" className="muted" style={{ color: '#a21b1b', marginTop: 10 }}>{error}</div>}
+      <button className="btn btn-primary btn-block" style={{ marginTop: 16 }} onClick={submit}>Salvar</button>
+    </div>
+  </div>;
+}
 
 function TeamForm({ team, t, onClose }) { const toast = useToast(); const members = t.playersOfTeam(team).filter(p => p.registrationValid !== false); function change(p) { if (p.team === team) return t.assignPlayerToTeam(p.id, ''); if (members.length >= 6) return toast('O time já possui 6 jogadores válidos.'); t.assignPlayerToTeam(p.id, team); } return <div className="overlay" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button><h3>{team}</h3><div className="modal-sub">Escolha até 6 jogadores com inscrição válida. Ao selecionar alguém de outro time, ele será transferido.</div><div className="pick-list">{t.state.roster.filter(p => p.registrationValid !== false).map(p => <label className="pick-row" key={p.id}><span><input type="checkbox" checked={p.team === team} onChange={() => change(p)} style={{ width: 'auto', marginRight: 8 }} />{p.name}</span><span className="team-tag">{p.team !== team ? p.team : ''}</span></label>)}</div><button className="btn btn-danger btn-block" style={{ marginTop: 14 }} onClick={() => { if (confirm('Excluir ' + team + '? Os jogadores ficarão sem time.')) { t.deleteTeam(team); onClose(); } }}>Excluir time</button></div></div>; }
 

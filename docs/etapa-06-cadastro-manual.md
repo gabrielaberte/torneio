@@ -23,3 +23,14 @@ Criar/editar, campos opcionais, validação de limites, preservação de estatí
 
 ## O que não deve ser feito
 Não mudar regras de jogo, times ou elegibilidade fora do necessário.
+
+## Execução
+
+- Status: Implementação concluída; fluxos interativos ainda dependem de validação manual.
+- O formulário existente de jogador agora edita gênero, inscrição, pote (0–4), capitã, seis contagens de premiação e três contagens de pódio.
+- Pot e contagens aceitam vazio como não informado e zero como valor conhecido. Ao limpar um valor já preenchido, ele é salvo como `null`.
+- As contagens aceitam somente inteiros não negativos; pote aceita somente inteiro de 0 a 4. Erros são apresentados no formulário e os campos usam rótulos/estados acessíveis.
+- Novo cadastro continua gerando ID e sem time por padrão. Edição preserva time, ID, estatísticas atuais, propriedades desconhecidas e histórico não alterado; inscrição inválida mantém a regra existente de retirar o atleta do time.
+- `addPlayer` agora aceita os campos adicionais no objeto oficial do roster. `updatePlayer` combina parcialmente `scoutingHistory.awards` e `podiums` sem substituir campos não editados.
+- Verificação executada: `npm run build` passou. Não foram executados os cenários interativos de criação/edição desta etapa.
+- Arquivos: `src/components/admin/Cadastro.jsx`, `src/hooks/useTournament.js`, `src/styles.css`.
