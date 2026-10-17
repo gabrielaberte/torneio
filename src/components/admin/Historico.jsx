@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { getRegistryId, getViewerUrl, setViewerUrl } from '../../lib/storage';
-import { checkAdminSession, loginAdmin, logoutAdmin, projectScoutingPlayer } from '../../lib/cloud';
+import { buildPublicSnapshot, checkAdminSession, loginAdmin, logoutAdmin, projectScoutingPlayer } from '../../lib/cloud';
 import { ScoutingView } from '../public/PublicViewer';
 import { useToast } from '../ui/Toast';
 
@@ -12,6 +12,15 @@ export default function Historico({ t, eventId }) {
   const [showScoutingPreview, setShowScoutingPreview] = useState(false);
   const registryId = getRegistryId();
   const fixedLink = viewerUrl && registryId ? viewerUrl.replace(/\/$/, '') + '/?registry=' + registryId : null;
+  const publicSnapshot = buildPublicSnapshot(t.teams, t.state.standings, t.state.history, t.state.bracket, t.state.current, t.state.roster);
+  const publicSnapshotBytes = new TextEncoder().encode(JSON.stringify(publicSnapshot)).length;
+  const publicBinLimit = 1024 * 1024;
+  const publicSnapshotPercent = publicSnapshotBytes / publicBinLimit * 100;
+  const remainingBytes = Math.max(0, publicBinLimit - publicSnapshotBytes);
+
+  function formatBytes(bytes) {
+    return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
 
   useEffect(() => { checkAdminSession().then(setAuthenticated); }, []);
   async function signIn() {
@@ -64,6 +73,11 @@ export default function Historico({ t, eventId }) {
       </div>
       <div className="card">
         <h3>Publicar placar (site próprio)</h3>
+        <div className="storage-meter">
+          <div className="muted">Próxima publicação: <b>{formatBytes(publicSnapshotBytes)}</b> de 1 MB ({publicSnapshotPercent.toFixed(1)}%)</div>
+          <div className="storage-track"><div className={publicSnapshotPercent >= 100 ? 'storage-fill danger' : publicSnapshotPercent >= 85 ? 'storage-fill warning' : 'storage-fill'} style={{ width: `${Math.min(100, publicSnapshotPercent)}%` }} /></div>
+          <div className="muted">{publicSnapshotBytes > publicBinLimit ? `Acima do limite padrão em ${formatBytes(publicSnapshotBytes - publicBinLimit)}.` : `Espaço estimado restante: ${formatBytes(remainingBytes)}.`} O cálculo inclui as fotos e representa os dados locais ainda não publicados.</div>
+        </div>
         <div className="muted" style={{ marginBottom: 10 }}>Configure o link do site publicado uma única vez — ele vale para todos os torneios.</div>
         <label>Link do site publicado (Vercel)</label>
         <input type="text" placeholder="https://seu-projeto.vercel.app" value={viewerUrl} onChange={e => setViewerUrlState(e.target.value)} />

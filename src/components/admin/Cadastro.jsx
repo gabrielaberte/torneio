@@ -19,18 +19,26 @@ function compressPlayerPhoto(file) {
     const image = new Image();
     const objectUrl = URL.createObjectURL(file);
     image.onload = () => {
-      const maxSize = 160;
+      const maxSize = 112;
       const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
       const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
       const context = canvas.getContext('2d');
       if (!context) { URL.revokeObjectURL(objectUrl); reject(new Error('Não foi possível processar a imagem.')); return; }
       context.fillStyle = '#ffffff';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      let size = maxSize;
+      let dataUrl = '';
+      do {
+        const currentScale = Math.min(scale, size / Math.max(image.naturalWidth, image.naturalHeight));
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * currentScale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * currentScale));
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        dataUrl = canvas.toDataURL('image/jpeg', size === maxSize ? 0.5 : 0.4);
+        size = Math.floor(size * 0.8);
+      } while (dataUrl.length > 15000 && size >= 32);
       URL.revokeObjectURL(objectUrl);
-      resolve(canvas.toDataURL('image/jpeg', 0.68));
+      resolve(dataUrl);
     };
     image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Não foi possível abrir essa imagem.')); };
     image.src = objectUrl;

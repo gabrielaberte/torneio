@@ -113,8 +113,8 @@ export async function updateRegistry(registryId, eventBinId, eventName) {
   await adminJson('/v3/b/' + registryId, 'PUT', { body: { tournaments: list } });
 }
 
-export async function publishSnapshot(eventName, jsonbinId, registryId, teams, standings, history, bracket, current, roster = []) {
-  const snapshot = {
+export function buildPublicSnapshot(teams, standings, history, bracket, current, roster = []) {
+  return {
     updatedAt: new Date().toISOString(),
     standings: teams.map(team => ({ name: team, wins: standings[team] || 0 })).sort((a, b) => b.wins - a.wins),
     matches: history.map(match => ({
@@ -133,6 +133,10 @@ export async function publishSnapshot(eventName, jsonbinId, registryId, teams, s
       setNumber: current.sets.length + 1
     } : null
   };
+}
+
+export async function publishSnapshot(eventName, jsonbinId, registryId, teams, standings, history, bracket, current, roster = []) {
+  const snapshot = buildPublicSnapshot(teams, standings, history, bracket, current, roster);
   const eventBinId = await ensureEventBin(eventName, jsonbinId);
   await adminJson('/v3/b/' + eventBinId, 'PUT', { body: snapshot });
   const resolvedRegistryId = await ensureRegistry(registryId);
