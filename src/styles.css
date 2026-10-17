@@ -156,3 +156,24 @@ table.stat-table td{text-align:center; padding:7px 3px; border-top:1px solid var
 .scouting-count b{margin-left:3px;}
 .scouting-no-history{margin-top:12px; font-size:12px; opacity:.6;}
 @media (min-width:440px){.scouting-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+.player-list{display:grid; grid-template-columns:1fr; gap:0;}
+.player-card{min-width:0;}
+@media (min-width:760px){
+  body{padding-bottom:32px;}
+  #root{max-width:1180px; box-shadow:0 0 36px rgba(9,28,41,.12);}
+  .topbar{padding:20px 32px 16px;}
+  .topbar h1{font-size:26px;}
+  .tabs{justify-content:center;}
+  .tabs .tab{flex:0 1 180px; padding:13px 12px; font-size:12px;}
+  .content{padding:24px 32px;}
+  .player-list{grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:0 14px;}
+  .award-grid{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
+  .scouting-grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));}
+  .modal{max-width:800px; max-height:88vh; border-radius:18px;}
+  .overlay{align-items:center; padding:24px;}
+}
+@media (min-width:1200px){
+  #root{max-width:1360px;}
+  .content{padding:32px 48px;}
+}

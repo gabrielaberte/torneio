@@ -1,6 +1,6 @@
 ﻿import React, { useRef, useState } from 'react';
 import { GENDERS } from '../../lib/constants';
-import { parsePlayerWorkbook } from '../../lib/playerImport';
+import { normalizePlayerName, parsePlayerWorkbook } from '../../lib/playerImport';
 import { useToast } from '../ui/Toast';
 
 const AWARD_FIELDS = [
@@ -15,6 +15,7 @@ export default function Cadastro({ t }) {
   const [player, setPlayer] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [teamName, setTeamName] = useState('');
+  const [playerQuery, setPlayerQuery] = useState('');
   const [showImport, setShowImport] = useState(false);
   function save(data) {
     if (!data.name.trim()) { toast('Informe o nome.'); return; }
@@ -35,22 +36,27 @@ export default function Cadastro({ t }) {
   }
   return <>
     <div className="tabs"><div className={`tab ${view === 'players' ? 'active' : ''}`} onClick={() => setView('players')}>Jogadores</div><div className={`tab ${view === 'teams' ? 'active' : ''}`} onClick={() => setView('teams')}>Times</div></div>
-    {view === 'players' ? <Players t={t} onNew={() => setPlayer({ id: null, name: '', gender: 'M', registrationValid: false, isCaptain: false })} onEdit={setPlayer} onImport={() => setShowImport(true)} /> : <Teams t={t} name={teamName} setName={setTeamName} onAdd={addTeam} onSelect={setSelectedTeam} onRename={renameTeam} />}
+    {view === 'players' ? <Players t={t} query={playerQuery} onQueryChange={setPlayerQuery} onNew={() => setPlayer({ id: null, name: '', gender: 'M', registrationValid: false, isCaptain: false })} onEdit={setPlayer} onImport={() => setShowImport(true)} /> : <Teams t={t} name={teamName} setName={setTeamName} onAdd={addTeam} onSelect={setSelectedTeam} onRename={renameTeam} />}
     {showImport && <PlayerImportPreview t={t} roster={t.state.roster} onClose={() => setShowImport(false)} />}
     {player && <PlayerForm player={player} onClose={() => setPlayer(null)} onSave={save} />}
     {selectedTeam && <TeamForm team={selectedTeam} t={t} onClose={() => setSelectedTeam(null)} />}
   </>;
 }
 
-function Players({ t, onNew, onEdit, onImport }) {
+function Players({ t, query, onQueryChange, onNew, onEdit, onImport }) {
+  const normalizedQuery = normalizePlayerName(query);
+  const filteredPlayers = t.state.roster.filter(player => normalizePlayerName(player.name).includes(normalizedQuery));
   return <>
     <div className="card">
       <h3>Cadastro de jogadores</h3>
       <div className="muted" style={{ marginBottom: 12 }}>Cadastre nome, sexo e a validação da inscrição. Somente inscritos válidos podem entrar em um time.</div>
       <button className="btn btn-primary btn-block" onClick={onNew}>+ Cadastrar jogador</button>
       <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={onImport}>Importar planilha Excel · prévia</button>
+      <label htmlFor="roster-name-filter">Buscar jogador por nome</label>
+      <input id="roster-name-filter" type="text" value={query} onChange={event => onQueryChange(event.target.value)} placeholder="Digite o nome do jogador" />
+      {query && <div className="muted" style={{ marginTop: 7 }}>{filteredPlayers.length} de {t.state.roster.length} jogadores encontrados</div>}
     </div>
-    {t.state.roster.length === 0 ? <div className="empty">Nenhum jogador cadastrado.</div> : t.state.roster.map(p => <div className="card" key={p.id}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><div><b>{p.name}</b> <span className={`gender-badge ${p.gender}`}>{p.gender}</span><div className="muted" style={{ marginTop: 4 }}>{p.registrationValid === false ? 'Inscrição pendente' : 'Inscrição válida'} · {p.team || 'Sem time'}</div><div className="muted" style={{ marginTop: 4 }}>{p.pot === undefined || p.pot === null ? 'Pote não informado' : `Pote ${p.pot}`}{p.isCaptain ? ' · Capitã' : ''}</div></div><button className="btn btn-ghost" onClick={() => onEdit(p)}>Editar</button></div></div>)}
+    {t.state.roster.length === 0 ? <div className="empty">Nenhum jogador cadastrado.</div> : filteredPlayers.length === 0 ? <div className="empty">Nenhum jogador encontrado com esse nome.</div> : <div className="player-list">{filteredPlayers.map(p => <div className="card player-card" key={p.id}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><div><b>{p.name}</b> <span className={`gender-badge ${p.gender}`}>{p.gender}</span><div className="muted" style={{ marginTop: 4 }}>{p.registrationValid === false ? 'Inscrição pendente' : 'Inscrição válida'} · {p.team || 'Sem time'}</div><div className="muted" style={{ marginTop: 4 }}>{p.pot === undefined || p.pot === null ? 'Pote não informado' : `Pote ${p.pot}`}{p.isCaptain ? ' · Capitã' : ''}</div></div><button className="btn btn-ghost" onClick={() => onEdit(p)}>Editar</button></div></div>)}</div>}
   </>;
 }
 
@@ -231,7 +237,38 @@ function PlayerForm({ player, onClose, onSave }) {
   </div>;
 }
 
-function TeamForm({ team, t, onClose }) { const toast = useToast(); const members = t.playersOfTeam(team).filter(p => p.registrationValid !== false); function change(p) { if (p.team === team) return t.assignPlayerToTeam(p.id, ''); if (members.length >= 6) return toast('O time já possui 6 jogadores válidos.'); t.assignPlayerToTeam(p.id, team); } return <div className="overlay" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button><h3>{team}</h3><div className="modal-sub">Escolha até 6 jogadores com inscrição válida. Ao selecionar alguém de outro time, ele será transferido.</div><div className="pick-list">{t.state.roster.filter(p => p.registrationValid !== false).map(p => <label className="pick-row" key={p.id}><span><input type="checkbox" checked={p.team === team} onChange={() => change(p)} style={{ width: 'auto', marginRight: 8 }} />{p.name}</span><span className="team-tag">{p.team !== team ? p.team : ''}</span></label>)}</div><button className="btn btn-danger btn-block" style={{ marginTop: 14 }} onClick={() => { if (confirm('Excluir ' + team + '? Os jogadores ficarão sem time.')) { t.deleteTeam(team); onClose(); } }}>Excluir time</button></div></div>; }
+function TeamForm({ team, t, onClose }) {
+  const toast = useToast();
+  const [query, setQuery] = useState('');
+  const members = t.playersOfTeam(team).filter(player => player.registrationValid !== false);
+  const eligiblePlayers = t.state.roster.filter(player => player.registrationValid !== false);
+  const filteredPlayers = eligiblePlayers.filter(player => normalizePlayerName(player.name).includes(normalizePlayerName(query)));
+
+  function change(player) {
+    if (player.team === team) return t.assignPlayerToTeam(player.id, '');
+    if (members.length >= 6) return toast('O time já possui 6 jogadores válidos.');
+    t.assignPlayerToTeam(player.id, team);
+  }
+
+  return <div className="overlay" onClick={onClose}>
+    <div className="modal" onClick={event => event.stopPropagation()}>
+      <button className="modal-close" aria-label="Fechar seleção de jogadores" onClick={onClose}>×</button>
+      <h3>{team}</h3>
+      <div className="modal-sub">Escolha até 6 jogadores com inscrição válida. Ao selecionar alguém de outro time, ele será transferido.</div>
+      <label htmlFor="team-player-filter">Buscar jogador por nome</label>
+      <input id="team-player-filter" type="text" value={query} onChange={event => setQuery(event.target.value)} placeholder="Digite o nome do jogador" />
+      <div className="muted" style={{ margin: '8px 0' }}>{filteredPlayers.length} de {eligiblePlayers.length} jogadores encontrados · {members.length}/6 no time</div>
+      <div className="pick-list">
+        {filteredPlayers.map(player => <label className="pick-row" key={player.id}>
+          <span><input type="checkbox" checked={player.team === team} onChange={() => change(player)} style={{ width: 'auto', marginRight: 8 }} />{player.name}</span>
+          <span className="team-tag">{player.team && player.team !== team ? player.team : ''}</span>
+        </label>)}
+        {filteredPlayers.length === 0 && <div className="empty">Nenhum jogador encontrado com esse nome.</div>}
+      </div>
+      <button className="btn btn-danger btn-block" style={{ marginTop: 14 }} onClick={() => { if (confirm('Excluir ' + team + '? Os jogadores ficarão sem time.')) { t.deleteTeam(team); onClose(); } }}>Excluir time</button>
+    </div>
+  </div>;
+}
 
 
 
