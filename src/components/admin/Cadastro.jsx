@@ -28,9 +28,14 @@ export default function Cadastro({ t }) {
     setPlayer(null);
   }
   function addTeam() { const name = teamName.trim(); if (!name) return toast('Informe o nome do time.'); if (t.teams.includes(name)) return toast('Este time já existe.'); t.addTeam(name); setTeamName(''); }
+  function renameTeam(currentName) {
+    const nextName = window.prompt('Novo nome do time:', currentName);
+    if (nextName === null) return;
+    t.renameTeam(currentName, nextName);
+  }
   return <>
     <div className="tabs"><div className={`tab ${view === 'players' ? 'active' : ''}`} onClick={() => setView('players')}>Jogadores</div><div className={`tab ${view === 'teams' ? 'active' : ''}`} onClick={() => setView('teams')}>Times</div></div>
-    {view === 'players' ? <Players t={t} onNew={() => setPlayer({ id: null, name: '', gender: 'M', registrationValid: false, isCaptain: false })} onEdit={setPlayer} onImport={() => setShowImport(true)} /> : <Teams t={t} name={teamName} setName={setTeamName} onAdd={addTeam} onSelect={setSelectedTeam} />}
+    {view === 'players' ? <Players t={t} onNew={() => setPlayer({ id: null, name: '', gender: 'M', registrationValid: false, isCaptain: false })} onEdit={setPlayer} onImport={() => setShowImport(true)} /> : <Teams t={t} name={teamName} setName={setTeamName} onAdd={addTeam} onSelect={setSelectedTeam} onRename={renameTeam} />}
     {showImport && <PlayerImportPreview t={t} roster={t.state.roster} onClose={() => setShowImport(false)} />}
     {player && <PlayerForm player={player} onClose={() => setPlayer(null)} onSave={save} />}
     {selectedTeam && <TeamForm team={selectedTeam} t={t} onClose={() => setSelectedTeam(null)} />}
@@ -135,7 +140,7 @@ function PlayerImportPreview({ t, roster, onClose }) {
   </div>;
 }
 
-function Teams({ t, name, setName, onAdd, onSelect }) { return <><div className="card"><h3>Cadastrar time</h3><input value={name} onChange={e => setName(e.target.value)} placeholder="Nome do time" /><button className="btn btn-primary btn-block" style={{ marginTop: 12 }} onClick={onAdd}>+ Criar time</button></div>{t.teams.length === 0 ? <div className="empty">Cadastre um time para montar sua equipe.</div> : t.teams.map(team => { const count = t.playersOfTeam(team).filter(p => p.registrationValid !== false).length; return <div className="card" key={team}><h3>{team}</h3><div className="muted" style={{ marginBottom: 10 }}>{count}/6 jogadores com inscrição válida {count === 6 ? '· apto para jogar' : '· não apto para jogar'}</div><button className="btn btn-ghost btn-block" onClick={() => onSelect(team)}>Escolher jogadores</button></div>; })}</>; }
+function Teams({ t, name, setName, onAdd, onSelect, onRename }) { return <><div className="card"><h3>Cadastrar time</h3><input value={name} onChange={e => setName(e.target.value)} placeholder="Nome do time" /><button className="btn btn-primary btn-block" style={{ marginTop: 12 }} onClick={onAdd}>+ Criar time</button></div>{t.teams.length === 0 ? <div className="empty">Cadastre um time para montar sua equipe.</div> : t.teams.map(team => { const count = t.playersOfTeam(team).filter(p => p.registrationValid !== false).length; return <div className="card" key={team}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><h3>{team}</h3><button className="btn btn-ghost btn-sm" onClick={() => onRename(team)}>Editar nome</button></div><div className="muted" style={{ marginBottom: 10 }}>{count}/6 jogadores com inscrição válida {count === 6 ? '· apto para jogar' : '· não apto para jogar'}</div><button className="btn btn-ghost btn-block" onClick={() => onSelect(team)}>Escolher jogadores</button></div>; })}</>; }
 
 function PlayerForm({ player, onClose, onSave }) {
   const [name, setName] = useState(player.name || '');

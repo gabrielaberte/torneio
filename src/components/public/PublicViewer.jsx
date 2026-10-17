@@ -173,7 +173,10 @@ const PODIUM_LABELS = [['first', '1º lugar'], ['second', '2º lugar'], ['third'
 function ScoutingView({ snapshot }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [teamFilter, setTeamFilter] = useState('all');
   const players = snapshot && Array.isArray(snapshot.scoutingPlayers) ? snapshot.scoutingPlayers : [];
+  const teamNames = Array.from(new Set(players.map(player => String(player.team || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const hasUnassignedPlayers = players.some(player => !String(player.team || '').trim());
   const filtered = players.filter(player => {
     const awards = player.awards || {};
     const podiums = player.podiums || {};
@@ -183,7 +186,11 @@ function ScoutingView({ snapshot }) {
       || (filter === 'captains' && player.isCaptain)
       || (filter === 'podiums' && hasPodiums)
       || (filter === 'awards' && hasAwards);
-    return matchesFilter && String(player.name || '').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'));
+    const playerTeam = String(player.team || '').trim();
+    const matchesTeam = teamFilter === 'all'
+      || (teamFilter === '__unassigned__' && !playerTeam)
+      || (teamFilter.startsWith('team:') && playerTeam === teamFilter.slice(5));
+    return matchesFilter && matchesTeam && String(player.name || '').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'));
   });
 
   if (!snapshot) return <div className="empty">Carregando dados de scouting…</div>;
@@ -194,6 +201,12 @@ function ScoutingView({ snapshot }) {
     <>
       <label htmlFor="scouting-search">Buscar atleta</label>
       <input id="scouting-search" type="text" value={query} onChange={event => setQuery(event.target.value)} placeholder="Digite um nome" />
+      <label htmlFor="scouting-team-filter">Filtrar por time</label>
+      <select id="scouting-team-filter" value={teamFilter} onChange={event => setTeamFilter(event.target.value)}>
+        <option value="all">Todos os times</option>
+        {teamNames.map(team => <option value={`team:${team}`} key={team}>{team}</option>)}
+        {hasUnassignedPlayers && <option value="__unassigned__">Sem time</option>}
+      </select>
       <div className="scouting-filters" role="group" aria-label="Filtrar atletas">
         {filters.map(([value, label]) => <button type="button" key={value} className={`btn btn-sm ${filter === value ? 'btn-navy' : 'btn-ghost'}`} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}
       </div>
@@ -205,6 +218,7 @@ function ScoutingView({ snapshot }) {
             return (
               <article className={`scouting-card${player.potColor ? '' : ' scouting-card-no-pot'}`} style={player.potColor ? { backgroundColor: player.potColor } : undefined} key={`${player.name}-${index}`}>
                 <div className="scouting-card-heading"><h3>{player.name || 'Atleta'}</h3>{player.isCaptain && <span className="scouting-captain">Capitão/ã</span>}</div>
+                {String(player.team || '').trim() && <div className="scouting-team">{player.team}</div>}
                 {podiums.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Pódios</span><div className="scouting-counts">{podiums.map(([key, label]) => <span className="scouting-count" key={key}>{label} <b>{player.podiums[key]}</b></span>)}</div></div>}
                 {awards.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Premiações</span><div className="scouting-counts">{awards.map(([key, label]) => <span className="scouting-count" key={key}>{label} <b>{player.awards[key]}</b></span>)}</div></div>}
                 {podiums.length === 0 && awards.length === 0 && <div className="scouting-no-history">Sem histórico registrado</div>}

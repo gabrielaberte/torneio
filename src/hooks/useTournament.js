@@ -324,6 +324,42 @@ export function useTournament(eventId) {
       return s;
     });
   }
+  function renameTeam(currentName, nextName) {
+    const cleanedName = String(nextName || '').trim();
+    if (!cleanedName) { toast('Informe o novo nome do time.'); return false; }
+    if (cleanedName !== currentName && teams.includes(cleanedName)) { toast('Já existe um time com esse nome.'); return false; }
+    if (cleanedName === currentName) return true;
+    const renamed = value => value === currentName ? cleanedName : value;
+    const renameMatch = match => {
+      if (!match) return;
+      ['teamA', 'teamB', 'winner'].forEach(key => { if (match[key] === currentName) match[key] = cleanedName; });
+      (match.log || []).forEach(entry => {
+        if (entry.text === `Ponto coletivo: ${currentName}`) entry.text = `Ponto coletivo: ${cleanedName}`;
+      });
+    };
+    update(s => {
+      s.teamEntries = (s.teamEntries || []).map(renamed);
+      s.roster = (s.roster || []).map(player => player.team === currentName ? { ...player, team: cleanedName } : player);
+      if (Object.prototype.hasOwnProperty.call(s.standings || {}, currentName)) {
+        s.standings[cleanedName] = s.standings[currentName];
+        delete s.standings[currentName];
+      }
+      if (s.bracket) {
+        ['groupA', 'groupB', 'groupTeams'].forEach(key => {
+          if (Array.isArray(s.bracket[key])) s.bracket[key] = s.bracket[key].map(renamed);
+        });
+        (s.bracket.matches || []).forEach(renameMatch);
+      }
+      (s.history || []).forEach(renameMatch);
+      if (s.current) {
+        renameMatch(s.current);
+        (s.current.undoStack || []).forEach(entry => renameMatch(entry.match));
+      }
+      return s;
+    });
+    toast('Nome do time atualizado.');
+    return true;
+  }
   function deleteTeam(name) {
     update(s => {
       s.teamEntries = (s.teamEntries || []).filter(team => team !== name);
@@ -571,7 +607,7 @@ export function useTournament(eventId) {
 
   return {
     state, teams, eligibleTeams, playersOfTeam, getStats, playerName, isTeamEligible,
-    addPlayer, updatePlayer, deletePlayer, applyPlayerImport, resetTournament, addTeam, deleteTeam, assignPlayerToTeam,
+    addPlayer, updatePlayer, deletePlayer, applyPlayerImport, resetTournament, addTeam, renameTeam, deleteTeam, assignPlayerToTeam,
     saveGroups, generateBracket, generateGroupPhase, generateDoubleElimination, groupStandings, updateBracketMatch, moveBracketMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, publicationPending, activateSync, pushNow,

@@ -17,6 +17,7 @@ function projectScoutingPlayer(player) {
   const history = player.scoutingHistory || {};
   return {
     name: String(player.name || ''),
+    team: String(player.team || ''),
     isCaptain: player.isCaptain === true,
     potColor: Number.isInteger(player.pot) && player.pot >= 0 && player.pot <= 4 ? POT_COLORS[player.pot] : null,
     awards: projectCounts(history.awards, AWARD_KEYS),
