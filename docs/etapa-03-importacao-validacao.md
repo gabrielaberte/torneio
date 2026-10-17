@@ -1,25 +1,46 @@
 ﻿# Etapa 3 — Importação e validação de Excel
 
 ## Objetivo
-Planejar e implementar leitura, validação e prévia da planilha sem persistência definitiva.
+
+Ler planilha, validar os dados e permitir revisão de uma prévia sem persistir alterações no cadastro.
 
 ## Contexto
-A lista atual é `state.roster` e existe uma ação de importação no hook; conferir o fluxo vigente antes de integrá-lo.
 
-## Escopo
-Colunas: Nome, Gênero, Inscrição validada, Pot, MVP, Melhor sacador, Melhor defesa, Melhor ataque, Maior pontuador, Melhor bloqueio, 1º lugar, 2º lugar, 3º lugar. Nome, gênero e inscrição obrigatórios; inscrição aceita Sim/Não; pote opcional de 0 a 4; contagens opcionais inteiras não negativas.
+O roster oficial permanece em state.roster no estado do torneio. A biblioteca xlsx é carregada sob demanda ao selecionar arquivo. A ação de confirmar e a integração persistente são escopo da Etapa 4.
 
-## Requisitos
-Validar cabeçalhos e linhas, indicar erros por linha/campo, detectar possíveis duplicatas e apresentar prévia e resumo antes de confirmar. Células vazias não equivalem a zero nem apagam histórico. Cancelar não altera cadastro. Nesta etapa, não persistir dados.
+## Escopo implementado
+
+Na aba Elenco, o botão “Importar planilha Excel · prévia” abre uma janela para selecionar arquivos .xlsx ou .xls. A primeira aba do arquivo é lida. A interface apresenta resumo, linha de origem, nome, gênero, inscrição, pote, campos históricos preenchidos e resultado da validação.
+
+Os 13 cabeçalhos definidos no plano são exigidos: Nome, Gênero, Inscrição validada, Pot, MVP, Melhor sacador, Melhor defesa, Melhor ataque, Maior pontuador, Melhor bloqueio, 1º lugar, 2º lugar e 3º lugar. Os valores das colunas Pot e de histórico podem ficar vazios. Nomes de cabeçalho são comparados sem diferença de caixa/acentos; colunas extras são ignoradas. Gênero aceita M/Masculino e F/Feminino; inscrição aceita Sim/Não, sem diferença de caixa/acentos.
+
+## Requisitos e comportamento
+
+- Nome, gênero e inscrição validada são obrigatórios.
+- Pote aceita inteiro de 0 a 4. Célula vazia permanece ausente.
+- MVP, Melhor sacador, Melhor defesa, Melhor ataque, Maior pontuador, Melhor bloqueio e colocações de pódio aceitam inteiros não negativos. Células vazias permanecem ausentes.
+- Linhas totalmente vazias são ignoradas. Outros erros são apresentados por número de linha e campo.
+- Possíveis duplicatas são sinalizadas por nome normalizado (caixa, acentos e espaços), contra o roster existente e dentro do arquivo. Isso é apenas uma indicação; não faz fusão.
+- A prévia não chama ações de atualização do hook, não altera roster e não tem botão de confirmação. Fechar/cancelar descarta o resultado em memória.
 
 ## Restrições
-Adaptar arquitetura atual e dependências apenas se justificadas no escopo; não alterar estado oficial ao selecionar ou pré-visualizar arquivo.
+
+A importação nesta etapa não persiste, sincroniza nem publica. Não altera IDs, estatísticas, estado oficial ou dados existentes. A biblioteca é carregada dinamicamente para não aumentar o bundle inicial.
 
 ## Critérios de aceitação
-Arquivo válido gera prévia fiel; erros são explicados; duplicatas são sinalizadas; cancelamento deixa estado intacto; valores inválidos não passam silenciosamente.
+
+- Arquivo Excel válido pode ser lido e pré-visualizado.
+- Qualquer cabeçalho previsto ausente produz erro claro.
+- Valores fora do formato permitido geram erro por linha/campo.
+- Valores históricos e pote aparecem na prévia; vazio não é mostrado como zero.
+- Duplicatas possíveis são alertadas sem merge.
+- Cancelar/fechar não grava dados.
 
 ## Testes esperados
-Planilha válida, obrigatórios ausentes, Sim/Não inválido, pote fora da faixa, contagens fracionárias/negativas, células vazias, duplicatas, cabeçalhos incorretos e cancelamento.
+
+Build de produção executado com sucesso. Não há script de testes automatizados configurado no package.json e não foram executados testes automatizados nem cenários manuais de arquivos. Casos a cobrir em verificação posterior: planilha válida, obrigatórios ausentes, inscrição inválida, pote fora da faixa, contagens negativas/fracionárias, células vazias, duplicata, cabeçalhos ausentes, linha vazia e cancelamento.
 
 ## O que não deve ser feito
-Não salvar, sincronizar ou publicar os dados importados nesta etapa.
+
+Não confirmar ou salvar a importação, não criar IDs, não mesclar duplicatas, não modificar dados existentes e não avançar para Etapa 4 nesta etapa.
+
