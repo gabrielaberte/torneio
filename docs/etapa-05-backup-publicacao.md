@@ -23,7 +23,7 @@ Manter os novos campos nos backups e na sync privada, restaurar estados legados 
 Antes de publicar, definir as três variáveis no ambiente Vercel correspondente (Production e, quando necessário, Preview):
 
 - `JSONBIN_MASTER_KEY`: Master Key da conta JSONBin usada pelo projeto.
-- `VOLEI_ADMIN_PASSWORD`: senha administrativa forte e aleatória, com pelo menos 24 caracteres.
+- `VOLEI_ADMIN_PASSWORD`: senha administrativa com pelo menos 8 caracteres.
 - `VOLEI_SESSION_SECRET`: segredo HMAC aleatório com pelo menos 32 caracteres; deve ser diferente da senha.
 
 Sem essas variáveis, a Function de autenticação retorna erro de configuração e o proxy não faz chamadas administrativas. O repositório não contém valores dessas credenciais. Para desenvolvimento local com as Functions, usar `vercel dev`; o servidor Vite (`npm run dev`) sozinho não implementa `/api`.

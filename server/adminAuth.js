@@ -22,7 +22,7 @@ function signExpiry(expiry) {
 }
 
 export function checkAdminPassword(value) {
-  const expected = secret('VOLEI_ADMIN_PASSWORD', 24);
+  const expected = secret('VOLEI_ADMIN_PASSWORD', 8);
   return equalSecret(value, expected);
 }
 

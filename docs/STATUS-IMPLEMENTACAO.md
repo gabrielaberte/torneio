@@ -55,7 +55,7 @@
 - Decisões: Backup e sync preservam o estado integral; snapshot público usa allowlist; Master Key apenas na Function; sessão administrativa assinada em cookie HttpOnly.
 - Alterações realizadas: normalização compatível, projeção pública, Functions `/api/admin-auth` e `/api/jsonbin`, interface de login/logout e remoção da credencial antiga do localStorage. Detalhes em etapa-05-backup-publicacao.md.
 - Verificação: `npm run build` passou; sem chamadas reais à Vercel/JSONBin ou round-trip de backup.
-- Pendências: Configurar `JSONBIN_MASTER_KEY`, `VOLEI_ADMIN_PASSWORD` e `VOLEI_SESSION_SECRET` na Vercel; validar as Functions e fluxos com sessão na etapa 7.
+- Pendências: Configurar `JSONBIN_MASTER_KEY`, `VOLEI_ADMIN_PASSWORD` (mínimo 8 caracteres) e `VOLEI_SESSION_SECRET` (mínimo 32 caracteres) na Vercel; validar as Functions e fluxos com sessão na etapa 7.
 - Arquivos envolvidos: src/lib/storage.js, src/lib/cloud.js, src/hooks/useTournament.js, src/components/EventPicker.jsx, src/components/admin/Historico.jsx, src/App.jsx, api/admin-auth.js, api/jsonbin.js, server/adminAuth.js e docs/etapa-05-backup-publicacao.md.
 ## Registro por etapa futura
 
