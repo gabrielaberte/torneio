@@ -139,6 +139,7 @@ export async function parsePlayerWorkbook(arrayBuffer, existingPlayers = []) {
       errors,
       duplicate: Boolean(matches.length || duplicateInFile),
       duplicateNames: matches.map(player => player.name),
+      duplicateMatches: matches.map(player => ({ id: player.id, name: player.name })),
       duplicateInFile: Boolean(duplicateInFile),
       valid: errors.length === 0
     });
@@ -152,5 +153,6 @@ export async function parsePlayerWorkbook(arrayBuffer, existingPlayers = []) {
     skippedEmptyRows: rows.slice(1).filter(row => row.every(cell => cleanText(cell) === '')).length
   };
 }
+
 
 

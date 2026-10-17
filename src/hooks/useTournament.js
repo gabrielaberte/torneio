@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { EVENT_TYPES, emptyStats, uid } from '../lib/constants';
 import {
   defaultState, loadEventState, saveEventState, getEvents,
@@ -7,6 +7,7 @@ import {
 } from '../lib/storage';
 import { publishSnapshot as cloudPublish, activateSync as cloudActivateSync, pushCloud, pullCloud } from '../lib/cloud';
 import { useToast } from '../components/ui/Toast';
+import { normalizePlayerName } from '../lib/playerImport';
 
 export function useTournament(eventId) {
   const toast = useToast();
@@ -15,7 +16,7 @@ export function useTournament(eventId) {
   const syncTimer = useRef(null);
   const loadedFor = useRef(eventId);
 
-  // troca de torneio -> recarrega estado local e tenta puxar versão mais nova da nuvem
+  // troca de torneio -> recarrega estado local e tenta puxar versÃ£o mais nova da nuvem
   useEffect(() => {
     loadedFor.current = eventId;
     const s = loadEventState(eventId);
@@ -28,7 +29,7 @@ export function useTournament(eventId) {
         if (record && record.state && (!s.updatedAt || new Date(record.updatedAt) > new Date(s.updatedAt))) {
           if (loadedFor.current === eventId) {
             setState(record.state);
-            toast('🔄 Dados mais recentes da nuvem carregados');
+            toast('ðŸ”„ Dados mais recentes da nuvem carregados');
           }
         }
       } catch (e) { /* offline ou nunca sincronizado, segue local */ }
@@ -47,7 +48,7 @@ export function useTournament(eventId) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
-  // salva local sempre que o estado muda + agenda sincronização em nuvem (debounced)
+  // salva local sempre que o estado muda + agenda sincronizaÃ§Ã£o em nuvem (debounced)
   useEffect(() => {
     if (!eventId) return;
     const updatedAt = saveEventState(eventId, state);
@@ -87,7 +88,7 @@ export function useTournament(eventId) {
   }
   function playerName(id) {
     const p = state.roster.find(p => p.id === id);
-    return p ? p.name : '—';
+    return p ? p.name : 'â€”';
   }
 
   /* ---------- Elenco ---------- */
@@ -113,6 +114,59 @@ export function useTournament(eventId) {
     });
   }
 
+  function applyPlayerImport(selections) {
+    const roster = state.roster || [];
+    const selected = selections.filter(item => item.record.valid && item.choice && item.choice.action !== 'skip');
+    const nameCounts = new Map();
+    selected.forEach(item => {
+      const key = normalizePlayerName(item.record.data.name);
+      nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
+    });
+
+    let conflicts = selections.filter(item => item.record.valid && item.record.duplicate && (!item.choice || !item.choice.action)).length;
+    conflicts += Array.from(nameCounts.values()).filter(count => count > 1).length;
+    const operations = [];
+    selected.forEach(item => {
+      if (item.choice.action === 'add') operations.push({ type: 'add', id: uid(), data: item.record.data });
+      else if (item.choice.action === 'merge') {
+        const target = roster.find(player => player.id === item.choice.playerId);
+        if (!target) conflicts += 1;
+        else operations.push({ type: 'merge', playerId: target.id, data: item.record.data });
+      } else conflicts += 1;
+    });
+    if (conflicts) return { inserted: 0, updated: 0, ignored: selections.length - selected.length, conflicts };
+
+    if (!operations.length) return { inserted: 0, updated: 0, ignored: selections.length, conflicts: 0 };
+    const inserted = operations.filter(operation => operation.type === 'add').length;
+    const updated = operations.filter(operation => operation.type === 'merge').length;
+    update(s => {
+      operations.forEach(operation => {
+        if (operation.type === 'add') {
+          s.roster.push({ ...operation.data, id: operation.id, team: '' });
+          return;
+        }
+        s.roster = s.roster.map(player => {
+          if (player.id !== operation.playerId) return player;
+          const incoming = operation.data;
+          const next = { ...player, name: incoming.name, gender: incoming.gender, registrationValid: incoming.registrationValid };
+          if (Object.prototype.hasOwnProperty.call(incoming, 'pot')) next.pot = incoming.pot;
+          if (incoming.scoutingHistory) {
+            const oldHistory = player.scoutingHistory || {};
+            next.scoutingHistory = {
+              ...oldHistory,
+              ...incoming.scoutingHistory,
+              awards: { ...(oldHistory.awards || {}), ...(incoming.scoutingHistory.awards || {}) },
+              podiums: { ...(oldHistory.podiums || {}), ...(incoming.scoutingHistory.podiums || {}) }
+            };
+          }
+          if (next.registrationValid === false) next.team = '';
+          return next;
+        });
+      });
+      return s;
+    });
+    return { inserted, updated, ignored: selections.length - selected.length, conflicts: 0 };
+  }
   /* ---------- Jogo ao vivo ---------- */
   function startMatch({ teamA, teamB, bestOf, target, bracketMatchId = null }) {
     update(s => {
@@ -133,7 +187,7 @@ export function useTournament(eventId) {
     });
   }
 
-  /** Registra um evento de ponto. Se for Ace, retorna {askReceiver:true, opponentTeam} pro componente abrir o próximo passo. */
+  /** Registra um evento de ponto. Se for Ace, retorna {askReceiver:true, opponentTeam} pro componente abrir o prÃ³ximo passo. */
   function registerEvent(evtKey, playerId, playerTeam) {
     let askReceiver = null;
     update(s => {
@@ -142,8 +196,8 @@ export function useTournament(eventId) {
       const scoringTeam = ev.point === 'self' ? playerTeam : (playerTeam === m.teamA ? m.teamB : m.teamA);
       m.undoStack ||= [];
 
-      // Guarda o estado do placar antes do lance. Isso também permite desfazer
-      // o último ponto quando ele encerrou um set ou a partida.
+      // Guarda o estado do placar antes do lance. Isso tambÃ©m permite desfazer
+      // o Ãºltimo ponto quando ele encerrou um set ou a partida.
       m.undoStack.push({
         match: snapshotMatch(m),
         playerId,
@@ -164,11 +218,11 @@ export function useTournament(eventId) {
       }
 
       const player = s.roster.find(p => p.id === playerId);
-      m.log.push({ text: `${player ? player.name : '—'}: ${ev.label}`, score: `${m.currentSet.a}-${m.currentSet.b}` });
+      m.log.push({ text: `${player ? player.name : 'â€”'}: ${ev.label}`, score: `${m.currentSet.a}-${m.currentSet.b}` });
 
       if (evtKey === 'ace') {
         askReceiver = playerTeam === m.teamA ? m.teamB : m.teamA;
-        return s; // não fecha set ainda; espera a escolha do recebedor
+        return s; // nÃ£o fecha set ainda; espera a escolha do recebedor
       }
       checkSetEnd(s);
       return s;
@@ -324,7 +378,7 @@ export function useTournament(eventId) {
       Object.assign(m, lastPoint.match);
       return s;
     });
-    toast('Último ponto removido e estatísticas atualizadas.');
+    toast('Ãšltimo ponto removido e estatÃ­sticas atualizadas.');
   }
 
   function checkSetEnd(s) {
@@ -354,7 +408,7 @@ export function useTournament(eventId) {
       if (!s.playerStats[mvpId]) s.playerStats[mvpId] = emptyStats();
       s.playerStats[mvpId].mvp += 1;
       s.standings[m.winner] = (s.standings[m.winner] || 0) + 1;
-      const mvpName = (s.roster.find(p => p.id === mvpId) || {}).name || '—';
+      const mvpName = (s.roster.find(p => p.id === mvpId) || {}).name || 'â€”';
       s.history.push({ teamA: m.teamA, teamB: m.teamB, sets: m.sets, setsWonA: m.setsWonA, setsWonB: m.setsWonB, winner: m.winner, mvpName });
       if (m.bracketMatchId && s.bracket && s.bracket.matches) s.bracket.matches = s.bracket.matches.map(match => match.id === m.bracketMatchId ? { ...match, status: 'done', winner: m.winner, setsWonA: m.setsWonA, setsWonB: m.setsWonB, sets: m.sets } : match);
       if (m.bracketMatchId && s.bracket && s.bracket.matches) {
@@ -366,14 +420,14 @@ export function useTournament(eventId) {
     toast('Partida salva!');
   }
 
-  /* ---------- Nuvem: publicação pública + sincronização privada ---------- */
+  /* ---------- Nuvem: publicaÃ§Ã£o pÃºblica + sincronizaÃ§Ã£o privada ---------- */
   async function publish(isAutomaticRetry = false) {
     const key = getJsonbinKey();
     if (!key) { toast('Cole e salve sua Master Key primeiro (card "Conta jsonbin.io")'); return; }
     if (!navigator.onLine) {
       markPublicationPending(eventId);
       setPublicationPending(true);
-      if (!isAutomaticRetry) toast('Sem internet: publicação pendente até a conexão voltar.');
+      if (!isAutomaticRetry) toast('Sem internet: publicaÃ§Ã£o pendente atÃ© a conexÃ£o voltar.');
       return;
     }
     try {
@@ -385,11 +439,11 @@ export function useTournament(eventId) {
       update(s => { s.jsonbin = { id: eventBinId }; return s; });
       clearPendingPublication(eventId);
       setPublicationPending(false);
-      toast('✅ Placar publicado! Quem tiver o link fixo já vê este torneio na lista.');
+      toast('âœ… Placar publicado! Quem tiver o link fixo jÃ¡ vÃª este torneio na lista.');
     } catch (e) {
       markPublicationPending(eventId);
       setPublicationPending(true);
-      toast('Não foi possível publicar — confira sua conexão e a Master Key.');
+      toast('NÃ£o foi possÃ­vel publicar â€” confira sua conexÃ£o e a Master Key.');
     }
   }
   async function activateSync() {
@@ -398,16 +452,16 @@ export function useTournament(eventId) {
     try {
       const binId = await cloudActivateSync(key, currentEventName(eventId), state);
       update(s => { s.sync = { binId }; return s; });
-      toast('Sincronização ativada! Copie o código pra usar em outro aparelho.');
+      toast('SincronizaÃ§Ã£o ativada! Copie o cÃ³digo pra usar em outro aparelho.');
     } catch (e) {
-      toast('Erro ao ativar sincronização: verifique a Master Key.');
+      toast('Erro ao ativar sincronizaÃ§Ã£o: verifique a Master Key.');
     }
   }
   async function pushNow() {
     const key = getJsonbinKey();
-    if (!key || !state.sync.binId) { toast('Ative a sincronização primeiro'); return; }
+    if (!key || !state.sync.binId) { toast('Ative a sincronizaÃ§Ã£o primeiro'); return; }
     await pushCloud(key, state.sync.binId, currentEventName(eventId), state);
-    toast('✅ Sincronizado com a nuvem');
+    toast('âœ… Sincronizado com a nuvem');
   }
 
   function exportBackup() {
@@ -416,11 +470,11 @@ export function useTournament(eventId) {
   function importBackup(raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (!parsed.state) throw new Error('inválido');
+      if (!parsed.state) throw new Error('invÃ¡lido');
       setState(parsed.state);
       toast('Backup restaurado!');
     } catch (e) {
-      toast('Backup inválido.');
+      toast('Backup invÃ¡lido.');
     }
   }
 
@@ -428,7 +482,7 @@ export function useTournament(eventId) {
 
   return {
     state, teams, eligibleTeams, playersOfTeam, getStats, playerName, isTeamEligible,
-    addPlayer, updatePlayer, deletePlayer, addTeam, deleteTeam, assignPlayerToTeam,
+    addPlayer, updatePlayer, deletePlayer, applyPlayerImport, addTeam, deleteTeam, assignPlayerToTeam,
     saveGroups, generateBracket, generateGroupPhase, generateDoubleElimination, groupStandings, updateBracketMatch, moveBracketMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, publicationPending, activateSync, pushNow,
@@ -444,9 +498,9 @@ function buildBracketMatches(groupA, groupB) {
   return [
     ...groupMatches(groupA, 'Grupo A'),
     ...groupMatches(groupB, 'Grupo B'),
-    { id: uid(), phase: 'Semifinal 1', teamA: '1º Grupo A', teamB: '2º Grupo B', scheduledAt: '', status: 'scheduled' },
-    { id: uid(), phase: 'Semifinal 2', teamA: '1º Grupo B', teamB: '2º Grupo A', scheduledAt: '', status: 'scheduled' },
-    { id: uid(), phase: '3º lugar', teamA: 'Perdedor SF1', teamB: 'Perdedor SF2', scheduledAt: '', status: 'scheduled' },
+    { id: uid(), phase: 'Semifinal 1', teamA: '1Âº Grupo A', teamB: '2Âº Grupo B', scheduledAt: '', status: 'scheduled' },
+    { id: uid(), phase: 'Semifinal 2', teamA: '1Âº Grupo B', teamB: '2Âº Grupo A', scheduledAt: '', status: 'scheduled' },
+    { id: uid(), phase: '3Âº lugar', teamA: 'Perdedor SF1', teamB: 'Perdedor SF2', scheduledAt: '', status: 'scheduled' },
     { id: uid(), phase: 'Final', teamA: 'Vencedor SF1', teamB: 'Vencedor SF2', scheduledAt: '', status: 'scheduled' }
   ];
 }
@@ -485,3 +539,9 @@ function currentEventName(eventId) {
   const ev = getEvents().find(e => e.id === eventId);
   return ev ? ev.name : 'Torneio';
 }
+
+
+
+
+
+

@@ -5,7 +5,7 @@
 | 1 — Auditoria do código atual | Concluída |
 | 2 — Modelo de dados | Concluída |
 | 3 — Importação e validação de Excel | Concluída |
-| 4 — Persistência da importação | Não iniciada |
+| 4 — Persistência da importação | Concluída |
 | 5 — Backups e publicação | Não iniciada |
 | 6 — Cadastro manual | Não iniciada |
 | 7 — Testes de persistência, sincronização e uso offline | Não iniciada |
@@ -33,12 +33,21 @@
 
 ### Etapa 3 — Importação e validação de Excel
 
-- Status: Concluída (leitura, validação e prévia; sem persistência)
-- Decisões: Formatos .xlsx/.xls; primeira aba; os 13 cabeçalhos previstos são obrigatórios; gêneros aceitam M/F ou rótulos Masculino/Feminino; duplicidade por nome é apenas alerta.
-- Alterações realizadas: Leitor/validador em src/lib/playerImport.js; prévia cancelável na aba Elenco em src/components/admin/Cadastro.jsx; dependência xlsx em package.json/package-lock.json; especificação atualizada em etapa-03-importacao-validacao.md.
-- Testes executados e resultados: npm run build concluído. Nenhum script de teste automatizado existe/configurado; cenários de planilha não executados manualmente.
-- Pendências: Cobrir cenários de arquivos e validar a experiência manualmente antes da Etapa 4.
+- Status: Concluída (leitura, validação e prévia)
+- Decisões: Formatos .xlsx/.xls; primeira aba; os 13 cabeçalhos previstos são obrigatórios; gêneros aceitam M/F ou rótulos Masculino/Feminino; duplicidade por nome é apenas alerta até resolução na etapa 4.
+- Alterações realizadas: Leitor/validador em src/lib/playerImport.js; prévia em src/components/admin/Cadastro.jsx; dependência xlsx; detalhes em etapa-03-importacao-validacao.md.
+- Testes executados e resultados: Build de produção concluído durante a etapa 3.
+- Pendências: Cenários de planilha não foram executados manualmente.
 - Arquivos envolvidos: src/lib/playerImport.js, src/components/admin/Cadastro.jsx, package.json, package-lock.json e docs/etapa-03-importacao-validacao.md.
+
+### Etapa 4 — Persistência da importação
+
+- Status: Concluída (integração ao estado oficial)
+- Decisões: Importação usa state.roster; duplicatas exigem escolha por linha e múltiplas linhas selecionadas com o mesmo nome bloqueiam a transação. Merge por ID mantém team/playerStats e combina apenas campos históricos presentes; vazio não limpa. Nenhum snapshot público é acionado.
+- Alterações realizadas: Ação transacional applyPlayerImport no hook, escolhas/confirmar/resumo na prévia, regras detalhadas em etapa-04-persistencia.md.
+- Testes executados e resultados: npm run build concluído. Testes automatizados e cenários manuais não foram executados.
+- Pendências: Verificar casos de merge, duplicatas e cancelamento manualmente ou com testes dedicados.
+- Arquivos envolvidos: src/hooks/useTournament.js, src/components/admin/Cadastro.jsx, src/lib/playerImport.js e docs/etapa-04-persistencia.md.
 
 ## Registro por etapa futura
 
@@ -52,4 +61,3 @@ Copie esta seção para cada etapa iniciada:
 - Testes executados e resultados:
 - Pendências e dúvidas:
 - Arquivos envolvidos:
-
