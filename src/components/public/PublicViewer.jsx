@@ -67,7 +67,7 @@ export default function PublicViewer({ onSwitchRole }) {
             <button type="button" className={`tab ${tab === 'scouting' ? 'active' : ''}`} onClick={() => setTab('scouting')}>Scouting</button>
           </div>
           <div className="content">
-            {tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} />}
+            {tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
           </div>
         </>
       ) : (
@@ -169,12 +169,30 @@ const AWARD_LABELS = [
   ['bestAttack', 'Melhor ataque'], ['topScorer', 'Maior pontuador'], ['bestBlocker', 'Melhor bloqueio']
 ];
 const PODIUM_LABELS = [['first', '1º lugar'], ['second', '2º lugar'], ['third', '3º lugar']];
+const SCOUTING_COLORS = [
+  ['#d9e6f2', 'Azul'], ['#b9d9c8', 'Verde'], ['#f5dfa2', 'Amarelo'],
+  ['#efc1a6', 'Laranja'], ['#d8c1e8', 'Roxo']
+];
 
-function ScoutingView({ snapshot }) {
+function ScoutingView({ snapshot, tournamentId }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [teamFilter, setTeamFilter] = useState('all');
+  const [colorFilter, setColorFilter] = useState('all');
+  const storageKey = `volei_scouting_favorites_${tournamentId}`;
+  const [favorites, setFavorites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); }
+    catch { return []; }
+  });
   const players = snapshot && Array.isArray(snapshot.scoutingPlayers) ? snapshot.scoutingPlayers : [];
+  const playerKey = (player, index) => player.id || `${player.name || 'atleta'}-${index}`;
+  function toggleFavorite(id) {
+    setFavorites(current => {
+      const next = current.includes(id) ? current.filter(item => item !== id) : [...current, id];
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+  }
   const teamNames = Array.from(new Set(players.map(player => String(player.team || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const hasUnassignedPlayers = players.some(player => !String(player.team || '').trim());
   const filtered = players.filter(player => {
@@ -185,12 +203,20 @@ function ScoutingView({ snapshot }) {
     const matchesFilter = filter === 'all'
       || (filter === 'captains' && player.isCaptain)
       || (filter === 'podiums' && hasPodiums)
-      || (filter === 'awards' && hasAwards);
+      || (filter === 'awards' && hasAwards)
+      || filter === 'favorites'
+      || filter === 'favorites-available';
     const playerTeam = String(player.team || '').trim();
     const matchesTeam = teamFilter === 'all'
       || (teamFilter === '__unassigned__' && !playerTeam)
       || (teamFilter.startsWith('team:') && playerTeam === teamFilter.slice(5));
-    return matchesFilter && matchesTeam && String(player.name || '').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'));
+    const matchesColor = colorFilter === 'all'
+      || (colorFilter === '__none__' && !player.potColor)
+      || player.potColor === colorFilter;
+    const playerId = playerKey(player, players.indexOf(player));
+    const matchesFavorites = filter !== 'favorites' || favorites.includes(playerId);
+    const matchesFavoriteAvailable = filter !== 'favorites-available' || (favorites.includes(playerId) && !playerTeam);
+    return matchesFilter && matchesFavorites && matchesFavoriteAvailable && matchesTeam && matchesColor && String(player.name || '').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'));
   });
 
   if (!snapshot) return <div className="empty">Carregando dados de scouting…</div>;
@@ -207,18 +233,31 @@ function ScoutingView({ snapshot }) {
         {teamNames.map(team => <option value={`team:${team}`} key={team}>{team}</option>)}
         {hasUnassignedPlayers && <option value="__unassigned__">Sem time</option>}
       </select>
+      <label htmlFor="scouting-color-filter">Filtrar por cor do card</label>
+      <select id="scouting-color-filter" value={colorFilter} onChange={event => setColorFilter(event.target.value)}>
+        <option value="all">Todas as cores</option>
+        {SCOUTING_COLORS.filter(([color]) => players.some(player => player.potColor === color)).map(([color, label]) => <option value={color} key={color}>{label}</option>)}
+        {players.some(player => !player.potColor) && <option value="__none__">Sem cor</option>}
+      </select>
       <div className="scouting-filters" role="group" aria-label="Filtrar atletas">
         {filters.map(([value, label]) => <button type="button" key={value} className={`btn btn-sm ${filter === value ? 'btn-navy' : 'btn-ghost'}`} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}
+      </div>
+      <div className="scouting-filters" role="group" aria-label="Favoritos">
+        <button type="button" className={`btn btn-sm ${filter === 'favorites' ? 'btn-navy' : 'btn-ghost'}`} aria-pressed={filter === 'favorites'} onClick={() => setFilter('favorites')}>Meus favoritos ({favorites.length})</button>
+        <button type="button" className={`btn btn-sm ${filter === 'favorites-available' ? 'btn-navy' : 'btn-ghost'}`} aria-pressed={filter === 'favorites-available'} onClick={() => setFilter('favorites-available')}>Favoritos sem time</button>
       </div>
       {filtered.length === 0 ? <div className="empty">Nenhum atleta encontrado com esses critérios.</div> : (
         <div className="scouting-grid">
           {filtered.map((player, index) => {
+            const playerId = playerKey(player, players.indexOf(player));
+            const isFavorite = favorites.includes(playerId);
             const awards = AWARD_LABELS.filter(([key]) => Number.isInteger(player.awards && player.awards[key]) && player.awards[key] >= 0);
             const podiums = PODIUM_LABELS.filter(([key]) => Number.isInteger(player.podiums && player.podiums[key]) && player.podiums[key] >= 0);
             return (
-              <article className={`scouting-card${player.potColor ? '' : ' scouting-card-no-pot'}`} style={player.potColor ? { backgroundColor: player.potColor } : undefined} key={`${player.name}-${index}`}>
+              <article className={`scouting-card${player.potColor ? '' : ' scouting-card-no-pot'}`} style={player.potColor ? { backgroundColor: player.potColor } : undefined} key={playerId}>
+                <button type="button" className={`scouting-favorite${isFavorite ? ' active' : ''}`} aria-pressed={isFavorite} onClick={() => toggleFavorite(playerId)}>{isFavorite ? '★ Favorito' : '☆ Favoritar'}</button>
                 <div className="scouting-card-heading"><h3>{player.name || 'Atleta'}</h3>{player.isCaptain && <span className="scouting-captain">Capitão/ã</span>}</div>
-                {String(player.team || '').trim() && <div className="scouting-team">{player.team}</div>}
+                {String(player.team || '').trim() ? <div className="scouting-team">Já associado ao time: {player.team}</div> : <div className="scouting-available">Disponível para o draft</div>}
                 {podiums.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Pódios</span><div className="scouting-counts">{podiums.map(([key, label]) => <span className="scouting-count" key={key}>{label} <b>{player.podiums[key]}</b></span>)}</div></div>}
                 {awards.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Premiações</span><div className="scouting-counts">{awards.map(([key, label]) => <span className="scouting-count" key={key}>{label} <b>{player.awards[key]}</b></span>)}</div></div>}
                 {podiums.length === 0 && awards.length === 0 && <div className="scouting-no-history">Sem histórico registrado</div>}

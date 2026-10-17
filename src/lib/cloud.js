@@ -16,6 +16,7 @@ function projectCounts(source, allowedKeys) {
 function projectScoutingPlayer(player) {
   const history = player.scoutingHistory || {};
   return {
+    id: String(player.id || ''),
     name: String(player.name || ''),
     team: String(player.team || ''),
     isCaptain: player.isCaptain === true,
