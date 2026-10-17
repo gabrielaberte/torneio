@@ -6,12 +6,28 @@ function useRegistryId() {
   return id;
 }
 
+function updateViewerUrl(registryId, tournamentId, tab) {
+  const url = new URL(window.location.href);
+  if (registryId) url.searchParams.set('registry', registryId);
+  if (tournamentId) url.searchParams.set('tournament', tournamentId);
+  else url.searchParams.delete('tournament');
+  if (tab && tournamentId) url.searchParams.set('tab', tab);
+  else url.searchParams.delete('tab');
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 export default function PublicViewer({ onSwitchRole }) {
   const registryId = useRegistryId();
-  const [screen, setScreen] = useState('list'); // 'list' | 'tournament'
-  const [tab, setTab] = useState('times');
+  const [screen, setScreen] = useState(() => new URLSearchParams(window.location.search).has('tournament') ? 'tournament' : 'list');
+  const [tab, setTab] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('tab');
+    return ['times', 'jogos', 'scouting'].includes(requested) ? requested : 'times';
+  });
   const [tournaments, setTournaments] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(() => {
+    const binId = new URLSearchParams(window.location.search).get('tournament');
+    return binId ? { binId, name: 'Torneio' } : null;
+  });
   const [snapshot, setSnapshot] = useState(null);
   const pollTimer = useRef(null);
 
@@ -21,7 +37,11 @@ export default function PublicViewer({ onSwitchRole }) {
     async function load() {
       try {
         const list = await fetchRegistryList(registryId);
-        if (alive) setTournaments(list);
+        if (alive) {
+          setTournaments(list);
+          const requestedId = new URLSearchParams(window.location.search).get('tournament');
+          if (requestedId) setSelected(previous => list.find(item => item.binId === requestedId) || previous);
+        }
       } catch (e) { /* mantém a última lista */ }
     }
     load();
@@ -45,9 +65,15 @@ export default function PublicViewer({ onSwitchRole }) {
 
   function openTournament(t) {
     setSelected(t); setSnapshot(null); setScreen('tournament'); setTab('times');
+    updateViewerUrl(registryId, t.binId, 'times');
   }
   function goBack() {
     setScreen('list'); setSelected(null); setSnapshot(null);
+    updateViewerUrl(registryId, null, null);
+  }
+  function changeTab(nextTab) {
+    setTab(nextTab);
+    if (selected) updateViewerUrl(registryId, selected.binId, nextTab);
   }
 
   const title = screen === 'tournament' && selected ? selected.name : 'Torneios de Vôlei';
@@ -62,9 +88,9 @@ export default function PublicViewer({ onSwitchRole }) {
       {screen === 'tournament' ? (
         <>
           <div className="tabs">
-            <button type="button" className={`tab ${tab === 'times' ? 'active' : ''}`} onClick={() => setTab('times')}>Classificação</button>
-            <button type="button" className={`tab ${tab === 'jogos' ? 'active' : ''}`} onClick={() => setTab('jogos')}>Próximos jogos</button>
-            <button type="button" className={`tab ${tab === 'scouting' ? 'active' : ''}`} onClick={() => setTab('scouting')}>Scouting</button>
+            <button type="button" className={`tab ${tab === 'times' ? 'active' : ''}`} onClick={() => changeTab('times')}>Classificação</button>
+            <button type="button" className={`tab ${tab === 'jogos' ? 'active' : ''}`} onClick={() => changeTab('jogos')}>Próximos jogos</button>
+            <button type="button" className={`tab ${tab === 'scouting' ? 'active' : ''}`} onClick={() => changeTab('scouting')}>Scouting</button>
           </div>
           <div className="content">
             {tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
@@ -168,7 +194,7 @@ const AWARD_LABELS = [
   ['mvp', 'MVP'], ['bestServer', 'Melhor sacador'], ['bestDefense', 'Melhor defesa'],
   ['bestAttack', 'Melhor ataque'], ['topScorer', 'Maior pontuador'], ['bestBlocker', 'Melhor bloqueio']
 ];
-const PODIUM_LABELS = [['first', '1º lugar'], ['second', '2º lugar'], ['third', '3º lugar']];
+const PODIUM_LABELS = [['first', '🥇', '1º lugar'], ['second', '🥈', '2º lugar'], ['third', '🥉', '3º lugar']];
 const SCOUTING_COLORS = [
   ['#d9e6f2', 'Azul'], ['#b9d9c8', 'Verde'], ['#f5dfa2', 'Amarelo'],
   ['#efc1a6', 'Laranja'], ['#d8c1e8', 'Roxo']
@@ -252,13 +278,12 @@ function ScoutingView({ snapshot, tournamentId }) {
             const playerId = playerKey(player, players.indexOf(player));
             const isFavorite = favorites.includes(playerId);
             const awards = AWARD_LABELS.filter(([key]) => Number.isInteger(player.awards && player.awards[key]) && player.awards[key] >= 0);
-            const podiums = PODIUM_LABELS.filter(([key]) => Number.isInteger(player.podiums && player.podiums[key]) && player.podiums[key] >= 0);
+            const podiums = PODIUM_LABELS.filter(([key]) => Number.isInteger(player.podiums && player.podiums[key]) && player.podiums[key] > 0);
             return (
               <article className={`scouting-card${player.potColor ? '' : ' scouting-card-no-pot'}`} style={player.potColor ? { backgroundColor: player.potColor } : undefined} key={playerId}>
-                <button type="button" className={`scouting-favorite${isFavorite ? ' active' : ''}`} aria-pressed={isFavorite} onClick={() => toggleFavorite(playerId)}>{isFavorite ? '★ Favorito' : '☆ Favoritar'}</button>
-                <div className="scouting-card-heading"><h3>{player.name || 'Atleta'}</h3>{player.isCaptain && <span className="scouting-captain">Capitão/ã</span>}</div>
+                <div className="scouting-card-heading"><h3>{player.name || 'Atleta'}</h3><button type="button" className={`scouting-favorite${isFavorite ? ' active' : ''}`} aria-pressed={isFavorite} aria-label={isFavorite ? `Remover ${player.name} dos favoritos` : `Favoritar ${player.name}`} onClick={() => toggleFavorite(playerId)}>{isFavorite ? '★' : '☆'}</button>{player.isCaptain && <span className="scouting-captain">Capitão/ã</span>}</div>
                 {String(player.team || '').trim() ? <div className="scouting-team">Já associado ao time: {player.team}</div> : <div className="scouting-available">Disponível para o draft</div>}
-                {podiums.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Pódios</span><div className="scouting-counts">{podiums.map(([key, label]) => <span className="scouting-count" key={key}>{label} <b>{player.podiums[key]}</b></span>)}</div></div>}
+                {podiums.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Pódios</span><div className="scouting-counts">{podiums.map(([key, medal, label]) => <span className="scouting-count scouting-medal" key={key} title={label} aria-label={`${label}: ${player.podiums[key]}`}><span aria-hidden="true">{medal}</span>{player.podiums[key] > 1 && <b>×{player.podiums[key]}</b>}</span>)}</div></div>}
                 {awards.length > 0 && <div className="scouting-section"><span className="scouting-section-title">Premiações</span><div className="scouting-counts">{awards.map(([key, label]) => <span className="scouting-count" key={key}>{label} <b>{player.awards[key]}</b></span>)}</div></div>}
                 {podiums.length === 0 && awards.length === 0 && <div className="scouting-no-history">Sem histórico registrado</div>}
               </article>
