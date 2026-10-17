@@ -13,7 +13,10 @@ export default defineConfig({
         theme_color: '#0f2a3d', background_color: '#ffffff',
         display: 'standalone', start_url: '/'
       },
-      workbox: { navigateFallback: '/index.html' }
+      workbox: {
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/]
+      }
     })
   ]
 });
