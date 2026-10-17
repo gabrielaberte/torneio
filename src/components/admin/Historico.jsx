@@ -35,6 +35,10 @@ export default function Historico({ t }) {
     const raw = prompt('Cole aqui o backup copiado anteriormente:');
     if (raw) t.importBackup(raw);
   }
+  function doResetTournament() {
+    if (!window.confirm('Apagar todos os registros deste torneio? Isso limpa elenco, times, estatísticas, partidas, placares e chaveamento. Esta ação não pode ser desfeita.')) return;
+    t.resetTournament();
+  }
 
   return (
     <>
@@ -71,6 +75,11 @@ export default function Historico({ t }) {
         <div className="muted" style={{ marginBottom: 10 }}>Copie o backup de vez em quando durante o torneio.</div>
         <button className="btn btn-ghost btn-block" style={{ marginBottom: 8 }} onClick={doExport}>Copiar backup</button>
         <button className="btn btn-ghost btn-block" onClick={doImportBackup}>Restaurar backup</button>
+      </div>
+      <div className="card">
+        <h3>Reiniciar torneio</h3>
+        <div className="muted" style={{ marginBottom: 10 }}>Apaga o elenco, times, estatísticas, partidas, placares e chaveamento deste torneio. Os links de publicação e sincronização são mantidos para você continuar usando o torneio vazio.</div>
+        <button className="btn btn-danger btn-block" onClick={doResetTournament}>Apagar dados e começar do zero</button>
       </div>
       {t.state.history.length === 0 ? <div className="empty"><div className="big">🗒️</div>Nenhuma partida finalizada ainda.</div> : [...t.state.history].reverse().map((m, i) => (
         <div key={i} className="card">

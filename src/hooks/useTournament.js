@@ -59,8 +59,21 @@ export function useTournament(eventId) {
 
   useEffect(() => {
     setPublicationPending(getPendingPublicationIds().includes(eventId));
-    function retryPendingPublication() {
-      if (getPendingPublicationIds().includes(eventId)) publish(true);
+    async function retryPendingPublication() {
+      if (!navigator.onLine || !getPendingPublicationIds().includes(eventId)) return;
+      const current = latestState.current;
+      if (!current.jsonbin || !current.jsonbin.id) return;
+      try {
+        const currentTeams = Array.from(new Set([...(current.teamEntries || []), ...(current.roster || []).map(player => player.team)].filter(Boolean))).sort();
+        const { eventBinId, registryId } = await cloudPublish(
+          currentEventName(eventId), current.jsonbin.id, getRegistryId(), currentTeams,
+          current.standings || {}, current.history || [], current.bracket, current.current, current.roster || []
+        );
+        setRegistryId(registryId);
+        update(s => { s.jsonbin = { id: eventBinId }; return s; });
+        clearPendingPublication(eventId);
+        setPublicationPending(false);
+      } catch { /* mantém pendente para nova tentativa ou publicação manual */ }
     }
     window.addEventListener('online', retryPendingPublication);
     if (navigator.onLine) retryPendingPublication();
@@ -146,6 +159,39 @@ export function useTournament(eventId) {
       });
       return s;
     });
+  }
+  async function resetTournament() {
+    const freshState = defaultState();
+    // Keep service links so this same tournament can continue to be published and synced.
+    freshState.jsonbin = { ...(state.jsonbin || { id: '' }) };
+    freshState.sync = { ...(state.sync || { binId: '' }) };
+    latestState.current = freshState;
+    update(freshState);
+    clearPendingPublication(eventId);
+    clearSyncPending(eventId);
+    setPublicationPending(false);
+    toast('Torneio limpo.');
+
+    if (!freshState.jsonbin.id) return;
+    if (!navigator.onLine) {
+      markPublicationPending(eventId);
+      setPublicationPending(true);
+      toast('Torneio limpo neste aparelho. A publicação vazia ficará pendente até a internet voltar.');
+      return;
+    }
+    try {
+      const { eventBinId, registryId } = await cloudPublish(
+        currentEventName(eventId), freshState.jsonbin.id, getRegistryId(),
+        [], freshState.standings, freshState.history, freshState.bracket, null, freshState.roster
+      );
+      setRegistryId(registryId);
+      update(s => { s.jsonbin = { id: eventBinId }; return s; });
+      toast('Torneio limpo e publicação pública atualizada.');
+    } catch {
+      markPublicationPending(eventId);
+      setPublicationPending(true);
+      toast('Torneio limpo neste aparelho. Não foi possível atualizar a publicação; publique novamente quando houver conexão.');
+    }
   }
   function deletePlayer(id) {
     update(s => {
@@ -525,7 +571,7 @@ export function useTournament(eventId) {
 
   return {
     state, teams, eligibleTeams, playersOfTeam, getStats, playerName, isTeamEligible,
-    addPlayer, updatePlayer, deletePlayer, applyPlayerImport, addTeam, deleteTeam, assignPlayerToTeam,
+    addPlayer, updatePlayer, deletePlayer, applyPlayerImport, resetTournament, addTeam, deleteTeam, assignPlayerToTeam,
     saveGroups, generateBracket, generateGroupPhase, generateDoubleElimination, groupStandings, updateBracketMatch, moveBracketMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, publicationPending, activateSync, pushNow,
