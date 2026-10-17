@@ -1,13 +1,15 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { getRegistryId, getViewerUrl, setViewerUrl } from '../../lib/storage';
-import { checkAdminSession, loginAdmin, logoutAdmin } from '../../lib/cloud';
+import { checkAdminSession, loginAdmin, logoutAdmin, projectScoutingPlayer } from '../../lib/cloud';
+import { ScoutingView } from '../public/PublicViewer';
 import { useToast } from '../ui/Toast';
 
-export default function Historico({ t }) {
+export default function Historico({ t, eventId }) {
   const toast = useToast();
   const [adminPassword, setAdminPassword] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
   const [viewerUrl, setViewerUrlState] = useState(getViewerUrl());
+  const [showScoutingPreview, setShowScoutingPreview] = useState(false);
   const registryId = getRegistryId();
   const fixedLink = viewerUrl && registryId ? viewerUrl.replace(/\/$/, '') + '/?registry=' + registryId : null;
 
@@ -68,6 +70,7 @@ export default function Historico({ t }) {
         <button className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={saveUrl}>Salvar link do site</button>
         {fixedLink ? <div className="muted" style={{ marginTop: 14 }}>Link fixo para compartilhar:<br /><b style={{ wordBreak: 'break-all' }}>{fixedLink}</b></div> : <div className="muted" style={{ marginTop: 10 }}>O link fixo aparece depois da primeira publicação.</div>}
         {t.publicationPending && <div className="muted" style={{ marginTop: 12 }}>Publicação pendente: será enviada quando a internet voltar.</div>}
+        <button className="btn btn-ghost btn-block" style={{ marginTop: 12 }} onClick={() => setShowScoutingPreview(true)}>Pré-visualizar Scouting neste aparelho</button>
         <button className="btn btn-navy btn-block" style={{ marginTop: 14 }} onClick={t.publish}>Publicar placar deste torneio</button>
       </div>
       <div className="card">
@@ -88,6 +91,14 @@ export default function Historico({ t }) {
           <div className="muted" style={{ marginTop: 6 }}>Vencedor: <b>{m.winner}</b> · MVP: <b>{m.mvpName || '—'}</b></div>
         </div>
       ))}
+      {showScoutingPreview && <div className="overlay" onClick={() => setShowScoutingPreview(false)}>
+        <div className="modal scouting-preview-modal" onClick={event => event.stopPropagation()}>
+          <button className="modal-close" aria-label="Fechar pré-visualização" onClick={() => setShowScoutingPreview(false)}>×</button>
+          <h3>Pré-visualização do Scouting</h3>
+          <div className="modal-sub">Dados locais deste aparelho. A prévia não publica alterações.</div>
+          <ScoutingView snapshot={{ scoutingPlayers: t.state.roster.map(projectScoutingPlayer) }} tournamentId={`local-preview-${eventId}`} />
+        </div>
+      </div>}
     </>
   );
 }

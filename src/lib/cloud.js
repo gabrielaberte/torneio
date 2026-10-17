@@ -13,7 +13,7 @@ function projectCounts(source, allowedKeys) {
     .map(key => [key, input[key]]));
 }
 
-function projectScoutingPlayer(player) {
+export function projectScoutingPlayer(player) {
   const history = player.scoutingHistory || {};
   return {
     id: String(player.id || ''),

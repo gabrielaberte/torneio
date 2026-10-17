@@ -200,7 +200,7 @@ const SCOUTING_COLORS = [
   ['#efc1a6', 'Laranja'], ['#d8c1e8', 'Roxo']
 ];
 
-function ScoutingView({ snapshot, tournamentId }) {
+export function ScoutingView({ snapshot, tournamentId }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [teamFilter, setTeamFilter] = useState('all');
@@ -290,7 +290,7 @@ function ScoutingView({ snapshot, tournamentId }) {
             const podiums = PODIUM_LABELS.filter(([key]) => Number.isInteger(player.podiums && player.podiums[key]) && player.podiums[key] > 0);
             return (
               <article className={`scouting-card${player.potColor ? '' : ' scouting-card-no-pot'}`} style={player.potColor ? { backgroundColor: player.potColor } : undefined} key={playerId}>
-                <div className="scouting-card-heading"><div className="scouting-avatar">{player.photo ? <img src={player.photo} alt="" loading="lazy" /> : <span aria-hidden="true">{String(player.name || 'A').trim().slice(0, 1).toLocaleUpperCase('pt-BR')}</span>}</div><h3>{player.name || 'Atleta'}</h3><button type="button" className={`scouting-favorite${isFavorite ? ' active' : ''}`} aria-pressed={isFavorite} aria-label={isFavorite ? `Remover ${player.name} dos favoritos` : `Favoritar ${player.name}`} onClick={() => toggleFavorite(playerId)}>{isFavorite ? '★' : '☆'}</button>{player.isCaptain && <span className="scouting-captain">Capitão/ã</span>}</div>
+                <div className="scouting-card-heading"><div className="scouting-avatar">{player.photo ? <img src={player.photo} alt="" loading="lazy" /> : <span aria-hidden="true">{String(player.name || 'A').trim().slice(0, 1).toLocaleUpperCase('pt-BR')}</span>}</div><div className="scouting-player-meta"><h3>{player.name || 'Atleta'}</h3>{player.isCaptain && <span className="scouting-captain">Capitão/ã</span>}</div><button type="button" className={`scouting-favorite${isFavorite ? ' active' : ''}`} aria-pressed={isFavorite} aria-label={isFavorite ? `Remover ${player.name} dos favoritos` : `Favoritar ${player.name}`} onClick={() => toggleFavorite(playerId)}>{isFavorite ? '★' : '☆'}</button></div>
                 {String(player.team || '').trim()
                   ? <div className="scouting-team">Já associado ao time: {player.team}</div>
                   : player.potColor

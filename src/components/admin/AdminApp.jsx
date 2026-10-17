@@ -55,7 +55,7 @@ export default function AdminApp({ eventId, onSwitchEvent, onSwitchRole }) {
         {tab === 'stats' && <Stats t={t} />}
         {tab === 'times' && <Times t={t} />}
         {tab === 'chaveamento' && <Formato2Fases t={t} />}
-        {tab === 'historico' && <Historico t={t} eventName={eventName} />}
+        {tab === 'historico' && <Historico t={t} eventId={eventId} eventName={eventName} />}
       </div>
     </>
   );
