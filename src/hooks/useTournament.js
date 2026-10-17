@@ -1,8 +1,8 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { EVENT_TYPES, emptyStats, uid } from '../lib/constants';
 import {
-  defaultState, loadEventState, saveEventState, getEvents,
-  getJsonbinKey, getRegistryId, setRegistryId, getViewerUrl,
+  defaultState, loadEventState, saveEventState, getEvents, normalizeEventState,
+  getRegistryId, setRegistryId, getViewerUrl,
   getPendingPublicationIds, markPublicationPending, clearPendingPublication
 } from '../lib/storage';
 import { publishSnapshot as cloudPublish, activateSync as cloudActivateSync, pushCloud, pullCloud } from '../lib/cloud';
@@ -22,13 +22,12 @@ export function useTournament(eventId) {
     const s = loadEventState(eventId);
     setState(s);
     (async () => {
-      const key = getJsonbinKey();
-      if (!key || !s.sync.binId) return;
+      if (!s.sync.binId) return;
       try {
-        const record = await pullCloud(key, s.sync.binId);
+        const record = await pullCloud(s.sync.binId);
         if (record && record.state && (!s.updatedAt || new Date(record.updatedAt) > new Date(s.updatedAt))) {
           if (loadedFor.current === eventId) {
-            setState(record.state);
+            setState(normalizeEventState(record.state));
             toast('ðŸ”„ Dados mais recentes da nuvem carregados');
           }
         }
@@ -52,11 +51,10 @@ export function useTournament(eventId) {
   useEffect(() => {
     if (!eventId) return;
     const updatedAt = saveEventState(eventId, state);
-    const key = getJsonbinKey();
-    if (state.sync.binId && key && navigator.onLine) {
+    if (state.sync.binId && navigator.onLine) {
       clearTimeout(syncTimer.current);
       syncTimer.current = setTimeout(() => {
-        pushCloud(key, state.sync.binId, currentEventName(eventId), { ...state, updatedAt });
+        pushCloud(state.sync.binId, currentEventName(eventId), { ...state, updatedAt });
       }, 4000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -420,48 +418,45 @@ export function useTournament(eventId) {
     toast('Partida salva!');
   }
 
-  /* ---------- Nuvem: publicaÃ§Ã£o pÃºblica + sincronizaÃ§Ã£o privada ---------- */
+  /* ---------- Nuvem: publicação pública + sincronização privada ---------- */
   async function publish(isAutomaticRetry = false) {
-    const key = getJsonbinKey();
-    if (!key) { toast('Cole e salve sua Master Key primeiro (card "Conta jsonbin.io")'); return; }
     if (!navigator.onLine) {
       markPublicationPending(eventId);
       setPublicationPending(true);
-      if (!isAutomaticRetry) toast('Sem internet: publicaÃ§Ã£o pendente atÃ© a conexÃ£o voltar.');
+      if (!isAutomaticRetry) toast('Sem internet: publicação pendente até a conexão voltar.');
       return;
     }
     try {
       const { eventBinId, registryId } = await cloudPublish(
-        key, currentEventName(eventId), state.jsonbin.id, getRegistryId(),
-        teams, state.standings, state.history, state.bracket, state.current
+        currentEventName(eventId), state.jsonbin.id, getRegistryId(),
+        teams, state.standings, state.history, state.bracket, state.current, state.roster
       );
       setRegistryId(registryId);
       update(s => { s.jsonbin = { id: eventBinId }; return s; });
       clearPendingPublication(eventId);
       setPublicationPending(false);
-      toast('âœ… Placar publicado! Quem tiver o link fixo jÃ¡ vÃª este torneio na lista.');
-    } catch (e) {
+      toast('Placar publicado! Quem tiver o link fixo já vê este torneio na lista.');
+    } catch {
       markPublicationPending(eventId);
       setPublicationPending(true);
-      toast('NÃ£o foi possÃ­vel publicar â€” confira sua conexÃ£o e a Master Key.');
+      toast('Não foi possível publicar. Entre no acesso administrativo e confira a conexão.');
     }
   }
+
   async function activateSync() {
-    const key = getJsonbinKey();
-    if (!key) { toast('Cole e salve sua Master Key primeiro'); return; }
     try {
-      const binId = await cloudActivateSync(key, currentEventName(eventId), state);
+      const binId = await cloudActivateSync(currentEventName(eventId), state);
       update(s => { s.sync = { binId }; return s; });
-      toast('SincronizaÃ§Ã£o ativada! Copie o cÃ³digo pra usar em outro aparelho.');
-    } catch (e) {
-      toast('Erro ao ativar sincronizaÃ§Ã£o: verifique a Master Key.');
+      toast('Sincronização ativada! Copie o código para usar em outro aparelho.');
+    } catch {
+      toast('Erro ao ativar sincronização. Entre no acesso administrativo e confira a conexão.');
     }
   }
+
   async function pushNow() {
-    const key = getJsonbinKey();
-    if (!key || !state.sync.binId) { toast('Ative a sincronizaÃ§Ã£o primeiro'); return; }
-    await pushCloud(key, state.sync.binId, currentEventName(eventId), state);
-    toast('âœ… Sincronizado com a nuvem');
+    if (!state.sync.binId) { toast('Ative a sincronização primeiro'); return; }
+    const saved = await pushCloud(state.sync.binId, currentEventName(eventId), state);
+    toast(saved ? 'Sincronizado com a nuvem' : 'Falha ao sincronizar. Entre no acesso administrativo e tente novamente.');
   }
 
   function exportBackup() {
@@ -471,7 +466,7 @@ export function useTournament(eventId) {
     try {
       const parsed = JSON.parse(raw);
       if (!parsed.state) throw new Error('invÃ¡lido');
-      setState(parsed.state);
+      setState(normalizeEventState(parsed.state));
       toast('Backup restaurado!');
     } catch (e) {
       toast('Backup invÃ¡lido.');
@@ -539,6 +534,10 @@ function currentEventName(eventId) {
   const ev = getEvents().find(e => e.id === eventId);
   return ev ? ev.name : 'Torneio';
 }
+
+
+
+
 
 
 
