@@ -408,14 +408,14 @@ export function useTournament(eventId) {
       const other = ranking.find(row => row.rank === (firstChoiceRank === 3 ? 4 : 3));
       const first = ranking[0], second = ranking[1], fifth = ranking[4], sixth = ranking[5];
       const elimination = [
-        { id: uid(), phase: 'Upper R1', teamA: first.name, teamB: pick.name, scheduledAt: '', status: 'scheduled', bestOf: 3 },
-        { id: uid(), phase: 'Upper R1', teamA: second.name, teamB: other.name, scheduledAt: '', status: 'scheduled', bestOf: 3 },
-        { id: uid(), phase: 'Upper Final', teamA: 'Vencedor Upper 1', teamB: 'Vencedor Upper 2', scheduledAt: '', status: 'scheduled', bestOf: 3 },
-        { id: uid(), phase: 'Lower R1', teamA: sixth.name, teamB: 'Perdedor Upper 1', scheduledAt: '', status: 'scheduled', bestOf: 3 },
-        { id: uid(), phase: 'Lower R1', teamA: fifth.name, teamB: 'Perdedor Upper 2', scheduledAt: '', status: 'scheduled', bestOf: 3 },
-        { id: uid(), phase: 'Lower R2', teamA: 'Vencedor Lower 1', teamB: 'Vencedor Lower 2', scheduledAt: '', status: 'scheduled', bestOf: 3 },
-        { id: uid(), phase: 'Lower Final', teamA: 'Vencedor Lower R2', teamB: 'Perdedor Upper Final', scheduledAt: '', status: 'scheduled', bestOf: 3 },
-        { id: uid(), phase: 'Grande Final', teamA: 'Vencedor Upper Final', teamB: 'Vencedor Lower Final', scheduledAt: '', status: 'scheduled', bestOf: 3 }
+        { id: uid(), progressionKey: 'upper1', phase: 'Upper R1', teamA: first.name, teamB: pick.name, scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), progressionKey: 'upper2', phase: 'Upper R1', teamA: second.name, teamB: other.name, scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), progressionKey: 'upperFinal', phase: 'Upper Final', teamA: 'Vencedor Upper 1', teamB: 'Vencedor Upper 2', teamAFrom: { key: 'upper1', result: 'winner' }, teamBFrom: { key: 'upper2', result: 'winner' }, scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), progressionKey: 'lower1', phase: 'Lower R1', teamA: sixth.name, teamB: 'Perdedor Upper 1', teamBFrom: { key: 'upper1', result: 'loser' }, scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), progressionKey: 'lower2', phase: 'Lower R1', teamA: fifth.name, teamB: 'Perdedor Upper 2', teamBFrom: { key: 'upper2', result: 'loser' }, scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), progressionKey: 'lowerR2', phase: 'Lower R2', teamA: 'Vencedor Lower 1', teamB: 'Vencedor Lower 2', teamAFrom: { key: 'lower1', result: 'winner' }, teamBFrom: { key: 'lower2', result: 'winner' }, scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), progressionKey: 'lowerFinal', phase: 'Lower Final', teamA: 'Vencedor Lower R2', teamB: 'Perdedor Upper Final', teamAFrom: { key: 'lowerR2', result: 'winner' }, teamBFrom: { key: 'upperFinal', result: 'loser' }, scheduledAt: '', status: 'scheduled', bestOf: 3 },
+        { id: uid(), progressionKey: 'grandFinal', phase: 'Grande Final', teamA: 'Vencedor Upper Final', teamB: 'Vencedor Lower Final', teamAFrom: { key: 'upperFinal', result: 'winner' }, teamBFrom: { key: 'lowerFinal', result: 'winner' }, scheduledAt: '', status: 'scheduled', bestOf: 3 }
       ];
       s.bracket.matches.push(...elimination); return s;
     });
@@ -533,9 +533,11 @@ export function useTournament(eventId) {
       s.standings[m.winner] = (s.standings[m.winner] || 0) + 1;
       const mvpName = (s.roster.find(p => p.id === mvpId) || {}).name || 'â€”';
       s.history.push({ teamA: m.teamA, teamB: m.teamB, sets: m.sets, setsWonA: m.setsWonA, setsWonB: m.setsWonB, winner: m.winner, mvpName });
-      if (m.bracketMatchId && s.bracket && s.bracket.matches) s.bracket.matches = s.bracket.matches.map(match => match.id === m.bracketMatchId ? { ...match, status: 'done', winner: m.winner, setsWonA: m.setsWonA, setsWonB: m.setsWonB, sets: m.sets } : match);
       if (m.bracketMatchId && s.bracket && s.bracket.matches) {
-        s.bracket.matches = s.bracket.matches.map(match => match.id === m.bracketMatchId ? { ...match, status: 'done' } : match);
+        s.bracket.matches = s.bracket.matches.map(match => match.id === m.bracketMatchId
+          ? { ...match, status: 'done', winner: m.winner, setsWonA: m.setsWonA, setsWonB: m.setsWonB, sets: m.sets }
+          : match);
+        resolveBracketProgression(s.bracket.matches);
       }
       s.current = null;
       return s;
@@ -614,6 +616,49 @@ export function useTournament(eventId) {
     exportBackup, importBackup,
     setModal
   };
+}
+
+function resolveBracketProgression(matches) {
+  // Backfill metadata for brackets generated before progression was added.
+  const phaseSlots = [
+    ['Upper R1', ['upper1', 'upper2']],
+    ['Upper Final', ['upperFinal']],
+    ['Lower R1', ['lower1', 'lower2']],
+    ['Lower R2', ['lowerR2']],
+    ['Lower Final', ['lowerFinal']],
+    ['Grande Final', ['grandFinal']]
+  ];
+  phaseSlots.forEach(([phase, keys]) => {
+    matches.filter(match => match.phase === phase).forEach((match, index) => {
+      if (!match.progressionKey && keys[index]) match.progressionKey = keys[index];
+    });
+  });
+  const dependencies = {
+    upperFinal: { teamAFrom: { key: 'upper1', result: 'winner' }, teamBFrom: { key: 'upper2', result: 'winner' } },
+    lower1: { teamBFrom: { key: 'upper1', result: 'loser' } },
+    lower2: { teamBFrom: { key: 'upper2', result: 'loser' } },
+    lowerR2: { teamAFrom: { key: 'lower1', result: 'winner' }, teamBFrom: { key: 'lower2', result: 'winner' } },
+    lowerFinal: { teamAFrom: { key: 'lowerR2', result: 'winner' }, teamBFrom: { key: 'upperFinal', result: 'loser' } },
+    grandFinal: { teamAFrom: { key: 'upperFinal', result: 'winner' }, teamBFrom: { key: 'lowerFinal', result: 'winner' } }
+  };
+  matches.forEach(match => {
+    Object.entries(dependencies[match.progressionKey] || {}).forEach(([side, source]) => {
+      if (!match[side]) match[side] = source;
+    });
+  });
+  const byKey = new Map(matches.filter(match => match.progressionKey).map(match => [match.progressionKey, match]));
+  // Repeat to resolve chains in the same update, independent of match display order.
+  for (let pass = 0; pass < matches.length; pass += 1) {
+    matches.forEach(match => {
+      ['teamA', 'teamB'].forEach(side => {
+        const sourceRef = match[`${side}From`];
+        const source = sourceRef && byKey.get(sourceRef.key);
+        if (!source || source.status !== 'done' || !source.winner) return;
+        const loser = source.teamA === source.winner ? source.teamB : source.teamA;
+        match[side] = sourceRef.result === 'winner' ? source.winner : loser;
+      });
+    });
+  }
 }
 
 function buildBracketMatches(groupA, groupB) {

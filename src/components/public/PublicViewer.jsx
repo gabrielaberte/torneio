@@ -21,7 +21,7 @@ export default function PublicViewer({ onSwitchRole }) {
   const [screen, setScreen] = useState(() => new URLSearchParams(window.location.search).has('tournament') ? 'tournament' : 'list');
   const [tab, setTab] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get('tab');
-    return ['times', 'jogos', 'scouting'].includes(requested) ? requested : 'times';
+    return ['times', 'equipes', 'jogos', 'scouting'].includes(requested) ? requested : 'times';
   });
   const [tournaments, setTournaments] = useState([]);
   const [selected, setSelected] = useState(() => {
@@ -89,11 +89,12 @@ export default function PublicViewer({ onSwitchRole }) {
         <>
           <div className="tabs">
             <button type="button" className={`tab ${tab === 'times' ? 'active' : ''}`} onClick={() => changeTab('times')}>Classificação</button>
+            <button type="button" className={`tab ${tab === 'equipes' ? 'active' : ''}`} onClick={() => changeTab('equipes')}>Times</button>
             <button type="button" className={`tab ${tab === 'jogos' ? 'active' : ''}`} onClick={() => changeTab('jogos')}>Próximos jogos</button>
             <button type="button" className={`tab ${tab === 'scouting' ? 'active' : ''}`} onClick={() => changeTab('scouting')}>Scouting</button>
           </div>
           <div className="content">
-            {tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
+            {tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'equipes' ? <PublicTeamsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
           </div>
         </>
       ) : (
@@ -127,20 +128,32 @@ function ListView({ registryId, tournaments, onOpen }) {
   ));
 }
 
-function StandingsView({ snapshot }) {
+export function StandingsView({ snapshot }) {
   if (!snapshot || !snapshot.standings || snapshot.standings.length === 0) {
     return <div className="empty"><div className="big">🏐</div>Este torneio ainda não tem classificação publicada.</div>;
   }
+  const playoffMatches = (snapshot.schedule || []).filter(match => match.phase !== 'Fase de grupos');
   return (
     <>
+      <div className="card muted">A tabela abaixo mostra a contagem de vitórias registradas. Ela não representa a colocação final nem define quem avançou no mata-mata.</div>
       <div className="card">
-        <h3 style={{ marginBottom: 10 }}>Classificação geral</h3>
+        <h3 style={{ marginBottom: 10 }}>Vitórias registradas</h3>
         {snapshot.standings.map((r, i) => (
           <div key={r.name} className="standing-row">
-            <div className="pos">{i + 1}</div><div className="tname">{r.name}</div><div className="wins">{r.wins}</div>
+            <div className="pos">{i + 1}</div><div className="tname">{r.name}</div><div className="wins">{r.wins} vitórias</div>
           </div>
         ))}
       </div>
+      {playoffMatches.length > 0 && <div className="card">
+        <h3 style={{ marginBottom: 6 }}>Mata-mata · Dia 2</h3>
+        <div className="muted" style={{ marginBottom: 10 }}>Os confrontos e seus resultados mostram quem chegou à final.</div>
+        {playoffMatches.map((match, index) => <div className="match-row" key={match.id || index}>
+          <b>{match.phase}:</b> {match.teamA} {match.status === 'done' ? `${match.setsWonA ?? 0}×${match.setsWonB ?? 0}` : '×'} {match.teamB}
+          {match.status === 'done' && match.winner
+            ? <> · <span className="win">Vencedor: {match.winner}</span></>
+            : <span className="muted"> · {match.status === 'live' ? 'Em andamento' : 'Agendado'}</span>}
+        </div>)}
+      </div>}
       <div className="updated">Atualizado em {new Date(snapshot.updatedAt).toLocaleString('pt-BR')}</div>
       {snapshot.matches && snapshot.matches.length > 0 && (
         <div className="card">
@@ -154,7 +167,7 @@ function StandingsView({ snapshot }) {
   );
 }
 
-function ScheduleView({ snapshot }) {
+export function ScheduleView({ snapshot }) {
   if (!snapshot || !snapshot.schedule || snapshot.schedule.length === 0) {
     return <div className="empty"><div className="big">📅</div>O chaveamento ainda não foi publicado.</div>;
   }
@@ -188,6 +201,35 @@ function ScheduleView({ snapshot }) {
   );
   /* legacy placeholder */
   return <div className="empty"><div className="big">📅</div>A tabela de próximos jogos ainda está sendo preparada.<br />Em breve você vai ver aqui os horários e confrontos.</div>;
+}
+
+export function PublicTeamsView({ snapshot }) {
+  if (!snapshot) return <div className="empty">Carregando times…</div>;
+  const players = Array.isArray(snapshot.scoutingPlayers) ? snapshot.scoutingPlayers : [];
+  const teams = [...new Set([
+    ...((snapshot.standings || []).map(team => team.name)),
+    ...players.map(player => String(player.team || '').trim()).filter(Boolean)
+  ])].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  if (teams.length === 0) return <div className="empty">Nenhum time publicado ainda.</div>;
+  return <>
+    <div className="teams-grid public-teams-grid">
+      {teams.map(team => {
+        const members = players.filter(player => String(player.team || '').trim() === team);
+        return <article className="card team-summary-card" key={team}>
+          <div className="team-summary-heading"><h3>{team}</h3></div>
+          <div className="team-member-chips">
+            {members.map(player => {
+              const pot = SCOUTING_COLORS.findIndex(([color]) => color === player.potColor);
+              return <span key={player.id || player.name} style={{ backgroundColor: player.potColor || '#f1f3f4' }}>{player.name}{pot >= 0 ? ` · P${pot}` : ''}</span>;
+            })}
+            {members.length === 0 && <span className="muted">Nenhum atleta selecionado</span>}
+          </div>
+          <div className="team-summary-footer"><span className={members.length === 6 ? 'team-ready' : 'team-not-ready'}>{members.length}/6 · {members.length === 6 ? 'Time completo' : 'Vagas disponíveis'}</span></div>
+        </article>;
+      })}
+    </div>
+    {snapshot.updatedAt && <div className="updated">Atualizado em {new Date(snapshot.updatedAt).toLocaleString('pt-BR')}</div>}
+  </>;
 }
 
 const AWARD_LABELS = [

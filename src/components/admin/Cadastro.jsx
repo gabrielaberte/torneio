@@ -349,7 +349,8 @@ function TeamForm({ team, t, onClose }) {
   const [potFilter, setPotFilter] = useState('all');
   const members = t.playersOfTeam(team).filter(player => player.registrationValid !== false);
   const eligiblePlayers = t.state.roster.filter(player => player.registrationValid !== false);
-  const filteredPlayers = eligiblePlayers.filter(player => {
+  const selectablePlayers = eligiblePlayers.filter(player => !player.team || player.team === team);
+  const filteredPlayers = selectablePlayers.filter(player => {
     const matchesName = normalizePlayerName(player.name).includes(normalizePlayerName(query));
     const matchesPot = potFilter === 'all'
       || (potFilter === '__none__' && (player.pot === undefined || player.pot === null))
@@ -377,7 +378,7 @@ function TeamForm({ team, t, onClose }) {
           {eligiblePlayers.some(player => player.pot === undefined || player.pot === null) && <option value="__none__">Sem pote</option>}
         </select></div>
       </div>
-      <div className="muted" style={{ margin: '8px 0' }}>{filteredPlayers.length} de {eligiblePlayers.length} jogadores encontrados · {members.length}/6 no time</div>
+      <div className="muted" style={{ margin: '8px 0' }}>{filteredPlayers.length} de {selectablePlayers.length} jogadores disponíveis · {members.length}/6 no time</div>
       <div className="pick-list">
         {filteredPlayers.map(player => <label className="pick-row" key={player.id} style={{ backgroundColor: Number.isInteger(player.pot) && POT_COLORS[player.pot] ? POT_COLORS[player.pot] : '#fff' }}>
           <span className="pick-player-name"><input type="checkbox" checked={player.team === team} disabled={Boolean(player.team && player.team !== team)} onChange={() => change(player)} style={{ width: 'auto', marginRight: 7 }} />{player.name}</span>

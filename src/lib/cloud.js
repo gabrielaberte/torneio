@@ -123,7 +123,8 @@ export function buildPublicSnapshot(teams, standings, history, bracket, current,
     })),
     schedule: ((bracket && bracket.matches) || []).map(match => ({
       id: match.id, phase: match.phase, teamA: match.teamA, teamB: match.teamB,
-      scheduledAt: match.scheduledAt, status: match.status
+      scheduledAt: match.scheduledAt, status: match.status, winner: match.winner,
+      setsWonA: match.setsWonA, setsWonB: match.setsWonB
     })),
     scoutingPlayers: (roster || []).map(projectScoutingPlayer),
     groups: bracket ? { groupA: bracket.groupA || [], groupB: bracket.groupB || [] } : { groupA: [], groupB: [] },

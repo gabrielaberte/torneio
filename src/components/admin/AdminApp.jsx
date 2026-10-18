@@ -7,7 +7,7 @@ import Jogo from './Jogo';
 import Stats from './Stats';
 import Times from './Times';
 import Historico from './Historico';
-import Formato2Fases from './Formato2Fases';
+import Formato2Fases from './Formato2FasesEditavel';
 
 const TABS = [
   ['elenco', 'Elenco'],

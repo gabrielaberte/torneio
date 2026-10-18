@@ -197,6 +197,14 @@ table.stat-table td{text-align:center; padding:7px 3px; border-top:1px solid var
 .team-ready,.team-not-ready{font-size:10px; font-weight:800;}
 .team-ready{color:#28633f;}
 .team-not-ready{color:#9a5b24;}
+.bracket-edit-card{padding:12px;}
+.bracket-edit-heading{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;}
+.bracket-edit-heading b{overflow-wrap:anywhere;}
+.bracket-edit-heading .muted{font-size:11px;}
+.bracket-edit-teams,.bracket-edit-meta{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;}
+.bracket-edit-card label{font-size:10px; margin:7px 0 3px;}
+.bracket-edit-card input[type=text],.bracket-edit-card input[type=datetime-local],.bracket-edit-card select{padding:8px; font-size:13px;}
+.bracket-edit-actions{display:flex; gap:8px; margin-top:10px;}
 .bulk-pot-controls{display:grid; grid-template-columns:minmax(0,1fr) minmax(130px,1fr); align-items:center; gap:8px; margin-top:10px; padding:10px; border-radius:10px; background:rgba(15,42,61,.06);}
 .bulk-pot-controls .btn{grid-column:1 / -1;}
 .bulk-pot-controls select{padding:8px 10px; font-size:13px;}
