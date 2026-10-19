@@ -101,14 +101,14 @@ export async function ensureRegistry(existingId) {
   return data.metadata.id;
 }
 
-export async function updateRegistry(registryId, eventBinId, eventName) {
+export async function updateRegistry(registryId, eventBinId, eventName, publishedAt) {
   let list = [];
   try {
     const data = await publicFetch(BASE + '/' + registryId + '/latest');
     list = (data && data.record && data.record.tournaments) || [];
   } catch { /* Índice ainda vazio ou indisponível. */ }
   const idx = list.findIndex(t => t.binId === eventBinId);
-  const entry = { name: eventName, binId: eventBinId, updatedAt: new Date().toISOString() };
+  const entry = { name: eventName, binId: eventBinId, updatedAt: publishedAt || new Date().toISOString() };
   if (idx >= 0) list[idx] = entry;
   else list.push(entry);
   await adminJson('/v3/b/' + registryId, 'PUT', { body: { tournaments: list } });
@@ -147,7 +147,7 @@ export async function publishSnapshot(eventName, jsonbinId, registryId, teams, s
   const eventBinId = await ensureEventBin(eventName, jsonbinId);
   await adminJson('/v3/b/' + eventBinId, 'PUT', { body: snapshot });
   const resolvedRegistryId = await ensureRegistry(registryId);
-  await updateRegistry(resolvedRegistryId, eventBinId, eventName);
+  await updateRegistry(resolvedRegistryId, eventBinId, eventName, snapshot.updatedAt);
   return { eventBinId, registryId: resolvedRegistryId };
 }
 

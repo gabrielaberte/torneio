@@ -122,7 +122,7 @@ function ListView({ registryId, tournaments, onOpen }) {
     <div key={t.binId} className="card clickable" onClick={() => onOpen(t)}>
       <div>
         <div className="tourn-name">{t.name}</div>
-        <div className="muted">Atualizado em {new Date(t.updatedAt).toLocaleString('pt-BR')}</div>
+        <div className="muted">Publicado em {new Date(t.updatedAt).toLocaleString('pt-BR')}</div>
       </div>
       <div className="chevron">›</div>
     </div>
