@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { getRegistryId, getViewerUrl, setViewerUrl } from '../../lib/storage';
 import { buildPublicSnapshot, checkAdminSession, loginAdmin, logoutAdmin } from '../../lib/cloud';
-import { PublicTeamsView, ScheduleView, ScoutingView, StandingsView } from '../public/PublicViewer';
+import { PublicAwardsView, PublicTeamsView, ScheduleView, ScoutingView, StandingsView } from '../public/PublicViewer';
 import { useToast } from '../ui/Toast';
 
 export default function Historico({ t, eventId }) {
@@ -12,7 +12,8 @@ export default function Historico({ t, eventId }) {
   const [previewTab, setPreviewTab] = useState(null);
   const registryId = getRegistryId();
   const fixedLink = viewerUrl && registryId ? viewerUrl.replace(/\/$/, '') + '/?registry=' + registryId : null;
-  const publicSnapshot = buildPublicSnapshot(t.teams, t.state.standings, t.state.history, t.state.bracket, t.state.current, t.state.roster);
+  const publicSnapshot = buildPublicSnapshot(t.teams, t.state.standings, t.state.history, t.state.bracket, t.state.current, t.state.roster, t.state.playerStats, t.state.publicAwardsEnabled);
+  const awardsPreviewSnapshot = buildPublicSnapshot(t.teams, t.state.standings, t.state.history, t.state.bracket, t.state.current, t.state.roster, t.state.playerStats, true);
   const publicSnapshotBytes = new TextEncoder().encode(JSON.stringify(publicSnapshot)).length;
   const publicBinLimit = 1024 * 1024;
   const publicSnapshotPercent = publicSnapshotBytes / publicBinLimit * 100;
@@ -88,7 +89,7 @@ export default function Historico({ t, eventId }) {
         <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => setPreviewTab('teams')}>Pré-visualizar Times neste aparelho</button>
         <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => setPreviewTab('standings')}>Pré-visualizar Classificação do modo acompanhante</button>
         <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => setPreviewTab('schedule')}>Pré-visualizar chaveamento público</button>
-        <button className="btn btn-navy btn-block" style={{ marginTop: 14 }} onClick={t.publish}>Publicar placar deste torneio</button>
+        <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => setPreviewTab('awards')}>Pré-visualizar Premiações neste aparelho</button>
       </div>
       <div className="card">
         <h3>Backup manual</h3>
@@ -111,9 +112,11 @@ export default function Historico({ t, eventId }) {
       {previewTab && <div className="overlay" onClick={() => setPreviewTab(null)}>
         <div className="modal scouting-preview-modal" onClick={event => event.stopPropagation()}>
           <button className="modal-close" aria-label="Fechar pré-visualização" onClick={() => setPreviewTab(null)}>×</button>
-          <h3>{previewTab === 'scouting' ? 'Pré-visualização do Scouting' : previewTab === 'teams' ? 'Pré-visualização de Times' : previewTab === 'standings' ? 'Pré-visualização da Classificação' : 'Pré-visualização do chaveamento público'}</h3>
+          <h3>{previewTab === 'scouting' ? 'Pré-visualização do Scouting' : previewTab === 'teams' ? 'Pré-visualização de Times' : previewTab === 'standings' ? 'Pré-visualização da Classificação' : previewTab === 'awards' ? 'Pré-visualização das Premiações' : 'Pré-visualização do chaveamento público'}</h3>
           <div className="modal-sub">Dados locais deste aparelho. A prévia não publica alterações.</div>
-          {previewTab === 'scouting'
+          {previewTab === 'awards'
+            ? <PublicAwardsView snapshot={awardsPreviewSnapshot} />
+            : previewTab === 'scouting'
             ? <ScoutingView snapshot={publicSnapshot} tournamentId={`local-preview-${eventId}`} />
             : previewTab === 'teams'
               ? <PublicTeamsView snapshot={publicSnapshot} />

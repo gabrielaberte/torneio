@@ -67,7 +67,7 @@ export function useTournament(eventId) {
         const currentTeams = Array.from(new Set([...(current.teamEntries || []), ...(current.roster || []).map(player => player.team)].filter(Boolean))).sort();
         const { eventBinId, registryId } = await cloudPublish(
           currentEventName(eventId), current.jsonbin.id, getRegistryId(), currentTeams,
-          current.standings || {}, current.history || [], current.bracket, current.current, current.roster || []
+          current.standings || {}, current.history || [], current.bracket, current.current, current.roster || [], current.playerStats || {}, current.publicAwardsEnabled === true
         );
         setRegistryId(registryId);
         update(s => { s.jsonbin = { id: eventBinId }; return s; });
@@ -182,7 +182,7 @@ export function useTournament(eventId) {
     try {
       const { eventBinId, registryId } = await cloudPublish(
         currentEventName(eventId), freshState.jsonbin.id, getRegistryId(),
-        [], freshState.standings, freshState.history, freshState.bracket, null, freshState.roster
+        [], freshState.standings, freshState.history, freshState.bracket, null, freshState.roster, freshState.playerStats, false
       );
       setRegistryId(registryId);
       update(s => { s.jsonbin = { id: eventBinId }; return s; });
@@ -423,7 +423,7 @@ export function useTournament(eventId) {
   function updateBracketMatch(id, changes) {
     update(s => {
       const bracket = s.bracket || { groupA: [], groupB: [], matches: [] };
-      bracket.matches = bracket.matches.map(match => match.id === id ? { ...match, ...changes } : match);
+      bracket.matches = bracket.matches.map(match => match.id === id && match.status !== 'done' ? { ...match, ...changes } : match);
       s.bracket = bracket;
       return s;
     });
@@ -433,13 +433,96 @@ export function useTournament(eventId) {
       const bracket = s.bracket || { groupA: [], groupB: [], matches: [] };
       const index = bracket.matches.findIndex(match => match.id === id);
       const target = index + direction;
-      if (index >= 0 && target >= 0 && target < bracket.matches.length) {
+      if (index >= 0 && target >= 0 && target < bracket.matches.length && bracket.matches[index].status !== 'done' && bracket.matches[target].status !== 'done') {
         [bracket.matches[index], bracket.matches[target]] = [bracket.matches[target], bracket.matches[index]];
       }
       s.bracket = bracket;
       return s;
     });
   }
+
+  function undoBracketMatchResult(id, removeMatch = false) {
+    update(s => {
+      if (!s.bracket || !Array.isArray(s.bracket.matches)) return s;
+      const matches = s.bracket.matches;
+      resolveBracketProgression(matches);
+      const target = matches.find(match => match.id === id);
+      if (!target || target.status !== 'done') return s;
+
+      const affectedKeys = new Set(target.progressionKey ? [target.progressionKey] : []);
+      const affectedIds = new Set([target.id]);
+      const isGroupPhase = /grupo|fase de grupos/i.test(target.phase || '');
+      if (isGroupPhase) {
+        matches.filter(match => !/grupo|fase de grupos/i.test(match.phase || '')).forEach(match => {
+          affectedIds.add(match.id);
+          if (match.progressionKey) affectedKeys.add(match.progressionKey);
+        });
+      }
+      let expanded = true;
+      while (expanded) {
+        expanded = false;
+        matches.forEach(match => {
+          if (affectedIds.has(match.id)) return;
+          const dependsOnAffected = ['teamAFrom', 'teamBFrom'].some(ref => match[ref] && affectedKeys.has(match[ref].key));
+          if (!dependsOnAffected) return;
+          affectedIds.add(match.id);
+          if (match.progressionKey) affectedKeys.add(match.progressionKey);
+          expanded = true;
+        });
+      }
+
+      const revertResult = match => {
+        if (!match || !match.winner) return;
+        s.standings[match.winner] = Math.max(0, (s.standings[match.winner] || 0) - 1);
+        let historyIndex = -1;
+        for (let i = s.history.length - 1; i >= 0; i -= 1) {
+          const item = s.history[i];
+          const sameMatch = item.bracketMatchId
+            ? item.bracketMatchId === match.id
+            : item.teamA === match.teamA && item.teamB === match.teamB && item.winner === match.winner;
+          if (sameMatch) { historyIndex = i; break; }
+        }
+        if (historyIndex < 0) return;
+        const [historyItem] = s.history.splice(historyIndex, 1);
+        Object.entries(historyItem.matchStats || {}).forEach(([playerId, stats]) => {
+          const playerStats = s.playerStats[playerId];
+          if (!playerStats) return;
+          Object.entries(stats).forEach(([key, value]) => {
+            playerStats[key] = Math.max(0, (playerStats[key] || 0) - (Number(value) || 0));
+          });
+        });
+        const mvp = historyItem.mvpId
+          ? s.roster.find(player => player.id === historyItem.mvpId)
+          : s.roster.find(player => player.name === historyItem.mvpName);
+        if (mvp && s.playerStats[mvp.id]) s.playerStats[mvp.id].mvp = Math.max(0, (s.playerStats[mvp.id].mvp || 0) - 1);
+      };
+
+      matches.forEach(match => {
+        if (!affectedIds.has(match.id)) return;
+        if (match.status === 'done') revertResult(match);
+        match.status = 'scheduled';
+        delete match.winner;
+        delete match.setsWonA;
+        delete match.setsWonB;
+        delete match.sets;
+      });
+      if (s.current && affectedIds.has(s.current.bracketMatchId)) s.current = null;
+      if ([...affectedIds].some(matchId => {
+        const affected = matches.find(match => match.id === matchId);
+        return affected && ['Final', 'Grande Final'].includes(affected.phase);
+      })) s.publicAwardsEnabled = false;
+      if (isGroupPhase) {
+        s.bracket.matches = matches.filter(match => /grupo|fase de grupos/i.test(match.phase || '') && (!removeMatch || match.id !== id));
+      } else if (removeMatch) {
+        s.bracket.matches = matches.filter(match => match.id !== id);
+      }
+      resolveBracketProgression(s.bracket.matches);
+      return s;
+    });
+    toast(removeMatch ? 'Partida excluída. Publique novamente para atualizar a visão pública.' : 'Resultado removido. Publique novamente para atualizar a visão pública.');
+  }
+
+  function deleteBracketMatch(id) { undoBracketMatchResult(id, true); }
 
   function registerTeamPoint(team) {
     update(s => {
@@ -532,7 +615,7 @@ export function useTournament(eventId) {
       s.playerStats[mvpId].mvp += 1;
       s.standings[m.winner] = (s.standings[m.winner] || 0) + 1;
       const mvpName = (s.roster.find(p => p.id === mvpId) || {}).name || 'â€”';
-      s.history.push({ teamA: m.teamA, teamB: m.teamB, sets: m.sets, setsWonA: m.setsWonA, setsWonB: m.setsWonB, winner: m.winner, mvpName });
+      s.history.push({ bracketMatchId: m.bracketMatchId || null, mvpId, matchStats: m.matchStats, teamA: m.teamA, teamB: m.teamB, sets: m.sets, setsWonA: m.setsWonA, setsWonB: m.setsWonB, winner: m.winner, mvpName });
       if (m.bracketMatchId && s.bracket && s.bracket.matches) {
         s.bracket.matches = s.bracket.matches.map(match => match.id === m.bracketMatchId
           ? { ...match, status: 'done', winner: m.winner, setsWonA: m.setsWonA, setsWonB: m.setsWonB, sets: m.sets }
@@ -556,7 +639,7 @@ export function useTournament(eventId) {
     try {
       const { eventBinId, registryId } = await cloudPublish(
         currentEventName(eventId), state.jsonbin.id, getRegistryId(),
-        teams, state.standings, state.history, state.bracket, state.current, state.roster
+        teams, state.standings, state.history, state.bracket, state.current, state.roster, state.playerStats, state.publicAwardsEnabled === true
       );
       setRegistryId(registryId);
       update(s => { s.jsonbin = { id: eventBinId }; return s; });
@@ -567,6 +650,35 @@ export function useTournament(eventId) {
       markPublicationPending(eventId);
       setPublicationPending(true);
       toast('Não foi possível publicar. Entre no acesso administrativo e confira a conexão.');
+    }
+  }
+
+  async function publishFinalAwards() {
+    const finalFinished = (state.bracket && state.bracket.matches || []).some(match =>
+      ['Final', 'Grande Final'].includes(match.phase) && match.status === 'done' && match.winner
+    );
+    if (!finalFinished) { toast('Finalize a partida final antes de publicar as premiações.'); return; }
+    if (!navigator.onLine) {
+      update(s => { s.publicAwardsEnabled = true; return s; });
+      markPublicationPending(eventId);
+      setPublicationPending(true);
+      toast('Premiações marcadas para publicação quando a internet voltar.');
+      return;
+    }
+    try {
+      const { eventBinId, registryId } = await cloudPublish(
+        currentEventName(eventId), state.jsonbin.id, getRegistryId(), teams,
+        state.standings, state.history, state.bracket, state.current, state.roster, state.playerStats, true
+      );
+      setRegistryId(registryId);
+      update(s => { s.publicAwardsEnabled = true; s.jsonbin = { id: eventBinId }; return s; });
+      clearPendingPublication(eventId);
+      setPublicationPending(false);
+      toast('Tabela de pontuação e premiações publicadas na visão pública.');
+    } catch {
+      markPublicationPending(eventId);
+      setPublicationPending(true);
+      toast('Não foi possível publicar as premiações. Tente novamente quando a conexão estiver disponível.');
     }
   }
 
@@ -610,9 +722,9 @@ export function useTournament(eventId) {
   return {
     state, teams, eligibleTeams, playersOfTeam, getStats, playerName, isTeamEligible,
     addPlayer, updatePlayer, deletePlayer, applyPlayerImport, resetTournament, addTeam, renameTeam, deleteTeam, assignPlayerToTeam,
-    saveGroups, generateBracket, generateGroupPhase, generateDoubleElimination, groupStandings, updateBracketMatch, moveBracketMatch,
+    saveGroups, generateBracket, generateGroupPhase, generateDoubleElimination, groupStandings, updateBracketMatch, moveBracketMatch, undoBracketMatchResult, deleteBracketMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
-    publish, publicationPending, activateSync, pushNow,
+    publish, publishFinalAwards, publicationPending, activateSync, pushNow,
     exportBackup, importBackup,
     setModal
   };
@@ -641,9 +753,20 @@ function resolveBracketProgression(matches) {
     lowerFinal: { teamAFrom: { key: 'lowerR2', result: 'winner' }, teamBFrom: { key: 'upperFinal', result: 'loser' } },
     grandFinal: { teamAFrom: { key: 'upperFinal', result: 'winner' }, teamBFrom: { key: 'lowerFinal', result: 'winner' } }
   };
+  const seeds = {
+    upperFinal: { teamASeed: 'Vencedor Upper 1', teamBSeed: 'Vencedor Upper 2' },
+    lower1: { teamBSeed: 'Perdedor Upper 1' },
+    lower2: { teamBSeed: 'Perdedor Upper 2' },
+    lowerR2: { teamASeed: 'Vencedor Lower 1', teamBSeed: 'Vencedor Lower 2' },
+    lowerFinal: { teamASeed: 'Vencedor Lower R2', teamBSeed: 'Perdedor Upper Final' },
+    grandFinal: { teamASeed: 'Vencedor Upper Final', teamBSeed: 'Vencedor Lower Final' }
+  };
   matches.forEach(match => {
     Object.entries(dependencies[match.progressionKey] || {}).forEach(([side, source]) => {
       if (!match[side]) match[side] = source;
+    });
+    Object.entries(seeds[match.progressionKey] || {}).forEach(([side, seed]) => {
+      if (!match[side]) match[side] = seed;
     });
   });
   const byKey = new Map(matches.filter(match => match.progressionKey).map(match => [match.progressionKey, match]));
@@ -653,7 +776,10 @@ function resolveBracketProgression(matches) {
       ['teamA', 'teamB'].forEach(side => {
         const sourceRef = match[`${side}From`];
         const source = sourceRef && byKey.get(sourceRef.key);
-        if (!source || source.status !== 'done' || !source.winner) return;
+        if (!source || source.status !== 'done' || !source.winner) {
+          if (match.status !== 'done' && match[`${side}Seed`]) match[side] = match[`${side}Seed`];
+          return;
+        }
         const loser = source.teamA === source.winner ? source.teamB : source.teamA;
         match[side] = sourceRef.result === 'winner' ? source.winner : loser;
       });

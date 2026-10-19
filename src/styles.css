@@ -26,6 +26,7 @@ button{font-family:inherit; cursor:pointer;}
 .topbar h1{font-size:22px; color:var(--white);}
 .topbar .sub{font-size:11px; opacity:.65; text-transform:uppercase; letter-spacing:.12em; margin-top:2px;}
 .topbar .sub span{cursor:pointer;}
+.admin-publish-button{margin-left:auto;flex:none;background:var(--coral);color:#fff;white-space:nowrap;}
 
 .tabs{display:flex; background:var(--navy-deep); position:sticky; top:70px; z-index:19; overflow-x:auto;}
 .tab{flex:1; text-align:center; padding:11px 6px; font-size:11.5px; font-weight:700; color:rgba(255,255,255,.5); border-bottom:3px solid transparent; white-space:nowrap; text-transform:uppercase; letter-spacing:.04em;}
@@ -127,6 +128,17 @@ table.stat-table td{text-align:center; padding:7px 3px; border-top:1px solid var
 .standing-row .pos{width:26px; font-family:'Anton',sans-serif; color:rgba(15,42,61,.4); font-size:16px;}
 .standing-row .tname{flex:1; font-weight:700;}
 .standing-row .wins{font-family:'Anton',sans-serif; font-size:20px; color:var(--navy);}
+.public-podium-section{margin-bottom:14px;}
+.public-podium-section>h2{font-size:19px;color:var(--navy);margin:0 0 10px;}
+.public-podium-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;align-items:stretch;}
+.public-podium-card{min-width:0;background:var(--white);border:1px solid var(--line);border-radius:14px;padding:11px 8px;text-align:center;box-shadow:0 1px 0 var(--line);}
+.public-podium-card.place-1{background:#fff8dc;border-color:#e6bd4f;}
+.public-podium-card.place-2{background:#f2f5f7;border-color:#b9c4cc;}
+.public-podium-card.place-3{background:#fff0e3;border-color:#c98a4b;}
+.public-podium-medal{font-size:30px;line-height:1.1;}
+.public-podium-place{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:rgba(15,42,61,.58);margin:5px 0;}
+.public-podium-card h3{font-size:14px;line-height:1.15;overflow-wrap:anywhere;margin:0 0 8px;}
+.public-podium-players{display:grid;gap:3px;font-size:10px;line-height:1.2;overflow-wrap:anywhere;}
 
 .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--navy); color:#fff; padding:10px 18px; border-radius:20px; font-size:13px; font-weight:600; z-index:60; box-shadow:0 6px 20px rgba(0,0,0,.2);}
 

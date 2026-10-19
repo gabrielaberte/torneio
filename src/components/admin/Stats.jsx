@@ -67,6 +67,9 @@ export default function Stats({ t }) {
   if (t.state.roster.length === 0) {
     return <div className="empty"><div className="big">📊</div>Cadastre participantes e jogue partidas para ver as estatísticas.</div>;
   }
+  const finalFinished = (t.state.bracket && t.state.bracket.matches || []).some(match =>
+    ['Final', 'Grande Final'].includes(match.phase) && match.status === 'done' && match.winner
+  );
   return (
     <>
       <div className="section-title">Prêmios · categorias boas</div>
@@ -90,6 +93,13 @@ export default function Stats({ t }) {
       </div>
       <div className="section-title">Tabela geral</div>
       <div className="card"><StatTable t={t} /></div>
+      <div className="card">
+        <h3>Publicar na visão acompanhante</h3>
+        <div className="muted" style={{ marginBottom: 10 }}>Após a final, publique a tabela de pontuação e as premiações por categoria em uma aba própria ao lado do Scouting.</div>
+        <button className="btn btn-navy btn-block" disabled={!finalFinished} onClick={t.publishFinalAwards}>
+          {finalFinished ? (t.state.publicAwardsEnabled ? 'Atualizar tabela e premiações públicas' : 'Publicar tabela e premiações') : 'Disponível após a final'}
+        </button>
+      </div>
     </>
   );
 }

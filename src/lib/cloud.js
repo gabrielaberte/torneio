@@ -4,6 +4,7 @@ const BASE = 'https://api.jsonbin.io/v3/b';
 const AWARD_KEYS = ['mvp', 'bestServer', 'bestDefense', 'bestAttack', 'topScorer', 'bestBlocker'];
 const PODIUM_KEYS = ['first', 'second', 'third'];
 const POT_COLORS = ['#d9e6f2', '#b9d9c8', '#f5dfa2', '#efc1a6', '#d8c1e8'];
+const PUBLIC_STAT_KEYS = ['points', 'aces', 'attacksGood', 'attacksBad', 'blocks', 'netTouches', 'serveErrors', 'mishits', 'drops', 'mvp'];
 
 function projectCounts(source, allowedKeys) {
   const input = source && typeof source === 'object' ? source : {};
@@ -113,7 +114,7 @@ export async function updateRegistry(registryId, eventBinId, eventName) {
   await adminJson('/v3/b/' + registryId, 'PUT', { body: { tournaments: list } });
 }
 
-export function buildPublicSnapshot(teams, standings, history, bracket, current, roster = []) {
+export function buildPublicSnapshot(teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false) {
   return {
     updatedAt: new Date().toISOString(),
     standings: teams.map(team => ({ name: team, wins: standings[team] || 0 })).sort((a, b) => b.wins - a.wins),
@@ -127,6 +128,11 @@ export function buildPublicSnapshot(teams, standings, history, bracket, current,
       setsWonA: match.setsWonA, setsWonB: match.setsWonB
     })),
     scoutingPlayers: (roster || []).map(projectScoutingPlayer),
+    publicAwardsEnabled: publicAwardsEnabled === true,
+    scoringPlayers: publicAwardsEnabled ? (roster || []).map(player => ({
+      id: String(player.id || ''), name: String(player.name || ''), team: String(player.team || ''), gender: String(player.gender || ''),
+      stats: Object.fromEntries(PUBLIC_STAT_KEYS.map(key => [key, Number(playerStats[player.id] && playerStats[player.id][key]) || 0]))
+    })) : [],
     groups: bracket ? { groupA: bracket.groupA || [], groupB: bracket.groupB || [] } : { groupA: [], groupB: [] },
     liveMatch: current ? {
       teamA: current.teamA, teamB: current.teamB, scoreA: current.currentSet.a,
@@ -136,8 +142,8 @@ export function buildPublicSnapshot(teams, standings, history, bracket, current,
   };
 }
 
-export async function publishSnapshot(eventName, jsonbinId, registryId, teams, standings, history, bracket, current, roster = []) {
-  const snapshot = buildPublicSnapshot(teams, standings, history, bracket, current, roster);
+export async function publishSnapshot(eventName, jsonbinId, registryId, teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false) {
+  const snapshot = buildPublicSnapshot(teams, standings, history, bracket, current, roster, playerStats, publicAwardsEnabled);
   const eventBinId = await ensureEventBin(eventName, jsonbinId);
   await adminJson('/v3/b/' + eventBinId, 'PUT', { body: snapshot });
   const resolvedRegistryId = await ensureRegistry(registryId);

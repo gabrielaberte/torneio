@@ -21,7 +21,7 @@ export default function PublicViewer({ onSwitchRole }) {
   const [screen, setScreen] = useState(() => new URLSearchParams(window.location.search).has('tournament') ? 'tournament' : 'list');
   const [tab, setTab] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get('tab');
-    return ['times', 'equipes', 'jogos', 'scouting'].includes(requested) ? requested : 'times';
+    return ['times', 'equipes', 'jogos', 'scouting', 'premios'].includes(requested) ? requested : 'times';
   });
   const [tournaments, setTournaments] = useState([]);
   const [selected, setSelected] = useState(() => {
@@ -92,9 +92,10 @@ export default function PublicViewer({ onSwitchRole }) {
             <button type="button" className={`tab ${tab === 'equipes' ? 'active' : ''}`} onClick={() => changeTab('equipes')}>Times</button>
             <button type="button" className={`tab ${tab === 'jogos' ? 'active' : ''}`} onClick={() => changeTab('jogos')}>Próximos jogos</button>
             <button type="button" className={`tab ${tab === 'scouting' ? 'active' : ''}`} onClick={() => changeTab('scouting')}>Scouting</button>
+            {snapshot && snapshot.publicAwardsEnabled && <button type="button" className={`tab ${tab === 'premios' ? 'active' : ''}`} onClick={() => changeTab('premios')}>Premiações</button>}
           </div>
           <div className="content">
-            {tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'equipes' ? <PublicTeamsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
+            {tab === 'premios' ? <PublicAwardsView snapshot={snapshot} /> : tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'equipes' ? <PublicTeamsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
           </div>
         </>
       ) : (
@@ -133,8 +134,30 @@ export function StandingsView({ snapshot }) {
     return <div className="empty"><div className="big">🏐</div>Este torneio ainda não tem classificação publicada.</div>;
   }
   const playoffMatches = (snapshot.schedule || []).filter(match => match.phase !== 'Fase de grupos');
+  const grandFinal = playoffMatches.find(match => /grande final|^final$/i.test(match.phase || '') && match.status === 'done' && match.winner);
+  const bronzeMatch = playoffMatches.find(match => /3.? lugar/i.test(match.phase || '') && match.status === 'done' && match.winner);
+  const lowerFinal = playoffMatches.find(match => /lower final/i.test(match.phase || '') && match.status === 'done' && match.winner);
+  const podium = grandFinal ? [
+    { place: 1, team: grandFinal.winner, medal: '🥇', label: 'Campeão' },
+    { place: 2, team: grandFinal.teamA === grandFinal.winner ? grandFinal.teamB : grandFinal.teamA, medal: '🥈', label: 'Vice-campeão' },
+    { place: 3, team: bronzeMatch ? bronzeMatch.winner : lowerFinal ? (lowerFinal.teamA === lowerFinal.winner ? lowerFinal.teamB : lowerFinal.teamA) : '', medal: '🥉', label: '3º lugar' }
+  ].filter(item => item.team) : [];
   return (
     <>
+      {podium.length > 0 && <section className="public-podium-section" aria-label="Pódio final">
+        <h2>🏆 Pódio final</h2>
+        <div className="public-podium-grid">
+          {podium.map(item => <article className={`public-podium-card place-${item.place}`} key={item.place}>
+            <div className="public-podium-medal" aria-hidden="true">{item.medal}</div>
+            <div className="public-podium-place">{item.label}</div>
+            <h3>{item.team}</h3>
+            <div className="public-podium-players">
+              {(snapshot.scoutingPlayers || []).filter(player => String(player.team || '').trim() === item.team).map((player, index) => <span key={player.id || `${player.name}-${index}`}>{player.name}</span>)}
+              {!(snapshot.scoutingPlayers || []).some(player => String(player.team || '').trim() === item.team) && <span className="muted">Atletas não publicados</span>}
+            </div>
+          </article>)}
+        </div>
+      </section>}
       <div className="card muted">A tabela abaixo mostra a contagem de vitórias registradas. Ela não representa a colocação final nem define quem avançou no mata-mata.</div>
       <div className="card">
         <h3 style={{ marginBottom: 10 }}>Vitórias registradas</h3>
@@ -167,6 +190,46 @@ export function StandingsView({ snapshot }) {
   );
 }
 
+const PUBLIC_AWARD_CATEGORIES = [
+  ['Maior pontuador geral', 'points', null], ['Maior pontuador masc.', 'points', 'M'], ['Maior pontuadora fem.', 'points', 'F'],
+  ['Melhor saque geral', 'aces', null], ['Melhor saque masc.', 'aces', 'M'], ['Melhor saque fem.', 'aces', 'F'],
+  ['Melhor ataque geral', 'attacksGood', null], ['Melhor ataque masc.', 'attacksGood', 'M'], ['Melhor ataque fem.', 'attacksGood', 'F'],
+  ['Melhor bloqueio', 'blocks', null], ['Mais quinadas', 'mishits', null], ['Mais erros de saque', 'serveErrors', null], ['Mais toques na rede', 'netTouches', null]
+];
+const PUBLIC_STAT_COLUMNS = [
+  ['points', 'Pts'], ['aces', 'Ace'], ['attacksGood', 'Atq✓'], ['attacksBad', 'Atq✗'], ['blocks', 'Blq'],
+  ['netTouches', 'Rede'], ['serveErrors', 'Saq✗'], ['mishits', 'Quin'], ['drops', 'Larg'], ['mvp', 'MVP']
+];
+const PUBLIC_MEDALS = ['🥇', '🥈', '🥉'];
+
+export function PublicAwardsView({ snapshot }) {
+  if (!snapshot || !snapshot.publicAwardsEnabled) return <div className="empty">As premiações ainda não foram publicadas.</div>;
+  const players = snapshot.scoringPlayers || [];
+  const sortedPlayers = [...players].sort((a, b) => (b.stats.points || 0) - (a.stats.points || 0) || a.name.localeCompare(b.name, 'pt-BR'));
+  return <>
+    <div className="section-title">Tabela geral de pontuação</div>
+    <div className="card"><div className="table-scroll"><table className="stat-table">
+      <thead><tr><th>Atleta</th>{PUBLIC_STAT_COLUMNS.map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead>
+      <tbody>{sortedPlayers.map(player => <tr key={player.id}>
+        <td>{player.name}<br /><span style={{ fontSize: 9, color: 'rgba(15,42,61,.5)' }}>{player.team}</span></td>
+        {PUBLIC_STAT_COLUMNS.map(([key]) => <td key={key}>{player.stats[key] || 0}</td>)}
+      </tr>)}</tbody>
+    </table></div></div>
+    <div className="section-title">Premiações por categoria</div>
+    <div className="award-grid">{PUBLIC_AWARD_CATEGORIES.map(([title, statKey, gender]) => {
+      const leaders = players.filter(player => (!gender || player.gender === gender) && (player.stats[statKey] || 0) > 0)
+        .sort((a, b) => (b.stats[statKey] || 0) - (a.stats[statKey] || 0)).slice(0, 3);
+      return <div className={`award-card${['mishits', 'serveErrors', 'netTouches'].includes(statKey) ? ' bad-award' : ''}`} key={title}>
+        <div className="a-label">{title}</div>
+        {leaders.length ? leaders.map((player, index) => <div className="a-row" key={player.id}>
+          <span className="medal">{PUBLIC_MEDALS[index]}</span><span className="aname">{player.name}</span><span className="aval">{player.stats[statKey]}</span>
+        </div>) : <div className="muted" style={{ fontSize: 12 }}>Sem dados</div>}
+      </div>;
+    })}</div>
+    {snapshot.updatedAt && <div className="updated">Atualizado em {new Date(snapshot.updatedAt).toLocaleString('pt-BR')}</div>}
+  </>;
+}
+
 export function ScheduleView({ snapshot }) {
   if (!snapshot || !snapshot.schedule || snapshot.schedule.length === 0) {
     return <div className="empty"><div className="big">📅</div>O chaveamento ainda não foi publicado.</div>;
@@ -182,7 +245,7 @@ export function ScheduleView({ snapshot }) {
           <div className="muted">Sets: {live.setsWonA} × {live.setsWonB}</div>
         </div>
       )}
-      {snapshot.groups && (snapshot.groups.groupA.length || snapshot.groups.groupB.length) && (
+      {snapshot.groups && (snapshot.groups.groupA.length > 0 || snapshot.groups.groupB.length > 0) && (
         <div className="card">
           <h3>Grupos</h3>
           <div className="muted"><b>Grupo A:</b> {snapshot.groups.groupA.join(' · ')}</div>

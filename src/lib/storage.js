@@ -7,6 +7,7 @@ export function defaultState() {
     playerStats: {},
     standings: {},
     history: [],
+    publicAwardsEnabled: false,
     bracket: { groupA: [], groupB: [], matches: [] },
     current: null,
     modal: null,

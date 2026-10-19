@@ -57,17 +57,19 @@ export default function Formato2Fases({ t }) {
             <div><label htmlFor={`match-${match.id}-b`}>Time B</label><select id={`match-${match.id}-b`} value={match.teamB || ''} disabled={locked} onChange={event => t.updateBracketMatch(match.id, { teamB: event.target.value })}><option value="">Selecione um time</option>{optionsFor(match.teamB, match.teamA).map(team => <option key={team} value={team}>{team}</option>)}</select></div>
           </div>
           <div className="bracket-edit-meta">
-            <div><label htmlFor={`match-${match.id}-time`}>Horário</label><input id={`match-${match.id}-time`} type="datetime-local" value={match.scheduledAt || ''} onChange={event => t.updateBracketMatch(match.id, { scheduledAt: event.target.value })} /></div>
+            <div><label htmlFor={`match-${match.id}-time`}>Horário</label><input id={`match-${match.id}-time`} type="datetime-local" value={match.scheduledAt || ''} disabled={match.status === 'done'} onChange={event => t.updateBracketMatch(match.id, { scheduledAt: event.target.value })} /></div>
             <div><label htmlFor={`match-${match.id}-bestof`}>Formato</label><select id={`match-${match.id}-bestof`} value={match.bestOf || 3} disabled={locked} onChange={event => t.updateBracketMatch(match.id, { bestOf: Number(event.target.value) })}><option value={3}>Melhor de 3</option><option value={5}>Melhor de 5</option></select></div>
           </div>
           {locked && <div className="muted" style={{ marginTop: 7 }}>Confronto bloqueado porque a partida já começou ou foi finalizada.</div>}
           <div className="bracket-edit-actions">
-            <button className="btn btn-ghost btn-sm" disabled={index === 0} onClick={() => t.moveBracketMatch(match.id, -1)}>↑ Subir</button>
-            <button className="btn btn-ghost btn-sm" disabled={index === matches.length - 1} onClick={() => t.moveBracketMatch(match.id, 1)}>↓ Descer</button>
+            {match.status === 'done' && <button className="btn btn-danger btn-sm" onClick={() => {
+              if (window.confirm('Excluir esta partida e seu resultado? Os jogos seguintes que dependem dela também serão reiniciados.')) t.deleteBracketMatch(match.id);
+            }}>Excluir partida</button>}
+            <button className="btn btn-ghost btn-sm" disabled={match.status === 'done' || index === 0 || matches[index - 1].status === 'done'} onClick={() => t.moveBracketMatch(match.id, -1)}>↑ Subir</button>
+            <button className="btn btn-ghost btn-sm" disabled={match.status === 'done' || index === matches.length - 1 || matches[index + 1].status === 'done'} onClick={() => t.moveBracketMatch(match.id, 1)}>↓ Descer</button>
           </div>
         </div>;
       })}
-      <button className="btn btn-navy btn-block" style={{ margin: '12px 0 20px' }} onClick={t.publish}>Atualizar chaveamento público</button>
     </>}
   </>;
 }

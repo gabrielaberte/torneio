@@ -37,7 +37,7 @@ export default function AdminApp({ eventId, onSwitchEvent, onSwitchRole }) {
   return (
     <>
       <div className="topbar">
-        <div className="brand"><div className="ball" /><h1>Torneio de Maluco</h1></div>
+        <div className="brand"><div className="ball" /><h1>Torneio de Maluco</h1><button type="button" className="btn btn-sm admin-publish-button" onClick={t.publish}>{t.publicationPending ? 'Publicar pendente' : 'Publicar placar'}</button></div>
         <div className="sub">
           <span>{eventName}</span>{' '}<button className="btn btn-sm btn-ghost" onClick={renameTournament}>Mudar nome</button>{' '}<span onClick={onSwitchEvent}>· trocar torneio ↺</span>
           {' '}|{' '}
