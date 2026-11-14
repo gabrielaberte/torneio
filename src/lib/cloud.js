@@ -1,10 +1,8 @@
-﻿// JSONBin public reads stay direct. Administrative writes and private reads go through Vercel Functions.
-const BASE = 'https://api.jsonbin.io/v3/b';
-
 const AWARD_KEYS = ['mvp', 'bestServer', 'bestDefense', 'bestAttack', 'topScorer', 'bestBlocker'];
 const PODIUM_KEYS = ['first', 'second', 'third'];
 const POT_COLORS = ['#d9e6f2', '#b9d9c8', '#f5dfa2', '#efc1a6', '#d8c1e8'];
 const PUBLIC_STAT_KEYS = ['points', 'aces', 'attacksGood', 'attacksBad', 'blocks', 'netTouches', 'serveErrors', 'mishits', 'drops', 'mvp'];
+const DEFAULT_REGISTRY_ID = '6ad30e27ffd5d1605372d8bd';
 
 function projectCounts(source, allowedKeys) {
   const input = source && typeof source === 'object' ? source : {};
@@ -34,36 +32,17 @@ async function readJson(response) {
   return data;
 }
 
-async function publicFetch(url) {
-  const response = await fetch(url);
-  const data = await response.json().catch(() => null);
-  if (!response.ok) throw new Error((data && data.message) || ('HTTP ' + response.status));
-  return data;
-}
-
-async function adminJson(path, method, options = {}) {
-  const response = await fetch('/api/jsonbin', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      path,
-      method,
-      headers: options.headers || {},
-      body: options.body === undefined ? undefined : JSON.stringify(options.body)
-    })
-  });
+async function backendJson(url, options = {}) {
+  const response = await fetch(url, { credentials: 'same-origin', ...options });
   return readJson(response);
 }
 
 async function authRequest(method, body) {
-  const response = await fetch('/api/admin-auth', {
+  return backendJson('/api/admin-auth', {
     method,
-    credentials: 'same-origin',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined
   });
-  return readJson(response);
 }
 
 export async function loginAdmin(password) {
@@ -81,37 +60,6 @@ export async function checkAdminSession() {
 
 export async function logoutAdmin() {
   await authRequest('DELETE');
-}
-
-export async function ensureEventBin(eventName, existingId) {
-  if (existingId) return existingId;
-  const data = await adminJson('/v3/b', 'POST', {
-    headers: { binPrivate: 'false', binName: eventName },
-    body: { updatedAt: new Date().toISOString(), standings: [], matches: [], schedule: [], scoutingPlayers: [] }
-  });
-  return data.metadata.id;
-}
-
-export async function ensureRegistry(existingId) {
-  if (existingId) return existingId;
-  const data = await adminJson('/v3/b', 'POST', {
-    headers: { binPrivate: 'false', binName: 'Índice de Torneios' },
-    body: { tournaments: [] }
-  });
-  return data.metadata.id;
-}
-
-export async function updateRegistry(registryId, eventBinId, eventName, publishedAt) {
-  let list = [];
-  try {
-    const data = await publicFetch(BASE + '/' + registryId + '/latest');
-    list = (data && data.record && data.record.tournaments) || [];
-  } catch { /* Índice ainda vazio ou indisponível. */ }
-  const idx = list.findIndex(t => t.binId === eventBinId);
-  const entry = { name: eventName, binId: eventBinId, updatedAt: publishedAt || new Date().toISOString() };
-  if (idx >= 0) list[idx] = entry;
-  else list.push(entry);
-  await adminJson('/v3/b/' + registryId, 'PUT', { body: { tournaments: list } });
 }
 
 export function buildPublicSnapshot(teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false) {
@@ -142,28 +90,31 @@ export function buildPublicSnapshot(teams, standings, history, bracket, current,
   };
 }
 
-export async function publishSnapshot(eventName, jsonbinId, registryId, teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false) {
+export async function publishSnapshot(eventName, eventBinId, registryId, teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false) {
   const snapshot = buildPublicSnapshot(teams, standings, history, bracket, current, roster, playerStats, publicAwardsEnabled);
-  const eventBinId = await ensureEventBin(eventName, jsonbinId);
-  await adminJson('/v3/b/' + eventBinId, 'PUT', { body: snapshot });
-  const resolvedRegistryId = await ensureRegistry(registryId);
-  await updateRegistry(resolvedRegistryId, eventBinId, eventName, snapshot.updatedAt);
-  return { eventBinId, registryId: resolvedRegistryId };
+  return backendJson('/api/tournament-public', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventName, eventBinId, registryId: registryId || DEFAULT_REGISTRY_ID, snapshot })
+  });
+}
+
+async function syncRequest(body) {
+  return backendJson('/api/tournament-sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
 }
 
 export async function activateSync(eventName, state) {
-  const data = await adminJson('/v3/b', 'POST', {
-    headers: { binPrivate: 'true', binName: 'sync-' + eventName },
-    body: { eventName, updatedAt: state.updatedAt, state }
-  });
-  return data.metadata.id;
+  const result = await syncRequest({ action: 'activate', eventName, state });
+  return result.binId;
 }
 
 export async function pushCloud(binId, eventName, state) {
   try {
-    await adminJson('/v3/b/' + binId, 'PUT', {
-      body: { eventName, updatedAt: state.updatedAt, state }
-    });
+    await syncRequest({ action: 'push', binId, eventName, state });
     return true;
   } catch {
     return false;
@@ -171,8 +122,8 @@ export async function pushCloud(binId, eventName, state) {
 }
 
 export async function pullCloud(binId) {
-  const data = await adminJson('/v3/b/' + binId + '/latest', 'GET');
-  return data && data.record;
+  const result = await syncRequest({ action: 'pull', binId });
+  return result && result.record;
 }
 
 export async function importSyncedEvent(code) {
@@ -182,11 +133,11 @@ export async function importSyncedEvent(code) {
 }
 
 export async function fetchRegistryList(registryId) {
-  const data = await publicFetch(BASE + '/' + registryId + '/latest');
-  return (data && data.record && data.record.tournaments) || [];
+  const query = new URLSearchParams({ registry: registryId });
+  return backendJson('/api/tournament-public?' + query.toString());
 }
 
 export async function fetchPublicSnapshot(binId) {
-  const data = await publicFetch(BASE + '/' + binId + '/latest');
-  return data && data.record;
+  const query = new URLSearchParams({ tournament: binId });
+  return backendJson('/api/tournament-public?' + query.toString());
 }
