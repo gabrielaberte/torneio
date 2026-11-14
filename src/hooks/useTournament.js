@@ -17,8 +17,15 @@ export function useTournament(eventId) {
   const syncTimer = useRef(null);
   const loadedFor = useRef(eventId);
   const latestState = useRef(state);
+  const publishAfterFinalize = useRef(false);
 
   useEffect(() => { latestState.current = state; }, [state]);
+
+  useEffect(() => {
+    if (!publishAfterFinalize.current) return;
+    publishAfterFinalize.current = false;
+    publish();
+  }, [state.history.length, publish]);
 
   useEffect(() => {
     async function retryPendingSync() {
@@ -626,6 +633,7 @@ export function useTournament(eventId) {
       return s;
     });
     toast('Partida salva!');
+    publishAfterFinalize.current = true;
   }
 
   /* ---------- Nuvem: publicação pública + sincronização privada ---------- */

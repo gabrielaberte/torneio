@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { fetchRegistryList, fetchPublicSnapshot } from '../../lib/cloud';
 
 function useRegistryId() {
@@ -29,10 +29,11 @@ export default function PublicViewer({ onSwitchRole }) {
     return binId ? { binId, name: 'Torneio' } : null;
   });
   const [snapshot, setSnapshot] = useState(null);
-  const pollTimer = useRef(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotError, setSnapshotError] = useState(false);
 
   useEffect(() => {
-    if (!registryId) return;
+    if (screen !== 'list' || !registryId) return;
     let alive = true;
     async function load() {
       try {
@@ -45,9 +46,8 @@ export default function PublicViewer({ onSwitchRole }) {
       } catch (e) { /* mantém a última lista */ }
     }
     load();
-    const timer = setInterval(load, 15000);
-    return () => { alive = false; clearInterval(timer); };
-  }, [registryId]);
+    return () => { alive = false; };
+  }, [registryId, screen]);
 
   useEffect(() => {
     if (screen !== 'tournament' || !selected) return;
@@ -56,15 +56,32 @@ export default function PublicViewer({ onSwitchRole }) {
       try {
         const record = await fetchPublicSnapshot(selected.binId);
         if (alive && record) setSnapshot(record);
-      } catch (e) { /* mantém o último placar */ }
+      } catch (e) {
+        if (alive) setSnapshotError(true);
+      }
     }
-    load();
-    pollTimer.current = setInterval(load, 15000);
-    return () => { alive = false; clearInterval(pollTimer.current); };
+    setSnapshotLoading(true);
+    load().finally(() => { if (alive) setSnapshotLoading(false); });
+    return () => { alive = false; };
   }, [screen, selected]);
 
+  async function refreshSnapshot() {
+    if (!selected) return;
+    setSnapshotLoading(true);
+    setSnapshotError(false);
+    try {
+      const record = await fetchPublicSnapshot(selected.binId);
+      if (record) setSnapshot(record);
+      else setSnapshotError(true);
+    } catch (e) {
+      setSnapshotError(true);
+    } finally {
+      setSnapshotLoading(false);
+    }
+  }
+
   function openTournament(t) {
-    setSelected(t); setSnapshot(null); setScreen('tournament'); setTab('times');
+    setSelected(t); setSnapshot(null); setSnapshotError(false); setScreen('tournament'); setTab('times');
     updateViewerUrl(registryId, t.binId, 'times');
   }
   function goBack() {
@@ -94,8 +111,16 @@ export default function PublicViewer({ onSwitchRole }) {
             <button type="button" className={`tab ${tab === 'scouting' ? 'active' : ''}`} onClick={() => changeTab('scouting')}>Scouting</button>
             {snapshot && snapshot.publicAwardsEnabled && <button type="button" className={`tab ${tab === 'premios' ? 'active' : ''}`} onClick={() => changeTab('premios')}>Premiações</button>}
           </div>
+          <div className="content" style={{ paddingTop: 0, paddingBottom: 0 }}>
+            <button type="button" className="btn btn-ghost btn-block" onClick={refreshSnapshot} disabled={snapshotLoading}>
+              {snapshotLoading ? 'Atualizando resultados…' : 'Atualizar resultados'}
+            </button>
+            {snapshotError && <div className="muted" role="alert" style={{ marginTop: 8 }}>Não foi possível carregar os resultados. Tente atualizar novamente.</div>}
+          </div>
           <div className="content">
-            {tab === 'premios' ? <PublicAwardsView snapshot={snapshot} /> : tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'equipes' ? <PublicTeamsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
+            {snapshotLoading && !snapshot
+              ? <div className="empty"><div className="big">🏐</div>Carregando resultados…</div>
+              : tab === 'premios' ? <PublicAwardsView snapshot={snapshot} /> : tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'equipes' ? <PublicTeamsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
           </div>
         </>
       ) : (
