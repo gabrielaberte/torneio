@@ -78,7 +78,7 @@ function buildGamesRows(state) {
 function buildStatsRows(state, teams, groupStandings) {
   const roster = Array.isArray(state.roster) ? state.roster : [];
   const playerStats = state.playerStats || {};
-  const matches = Array.isArray(state.history) ? state.history : [];
+  const matches = (Array.isArray(state.history) ? state.history : []).filter(match => !match.isPractice);
   const rows = [['CLASSIFICACAO GERAL']];
   if (groupStandings && groupStandings.length) {
     rows.push(['Posicao', 'Time', 'Pontos', 'Vitorias', 'Saldo de pontos', 'Jogos disputados']);

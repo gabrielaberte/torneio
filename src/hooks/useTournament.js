@@ -530,12 +530,30 @@ export function useTournament(eventId) {
         s.bracket.matches = matches.filter(match => match.id !== id);
       }
       resolveBracketProgression(s.bracket.matches);
+      rebuildTournamentAggregates(s);
       return s;
     });
     toast(removeMatch ? 'Partida excluída. Publique novamente para atualizar a visão pública.' : 'Resultado removido. Publique novamente para atualizar a visão pública.');
   }
 
   function deleteBracketMatch(id) { undoBracketMatchResult(id, true); }
+
+  function deleteHistoryMatch(historyIndex) {
+    const match = state.history[historyIndex];
+    if (!match) return;
+    const isBracketMatch = match.bracketMatchId && (state.bracket?.matches || []).some(item => item.id === match.bracketMatchId);
+    if (isBracketMatch) {
+      undoBracketMatchResult(match.bracketMatchId, false);
+      return;
+    }
+    update(s => {
+      if (!s.history[historyIndex]) return s;
+      s.history.splice(historyIndex, 1);
+      rebuildTournamentAggregates(s);
+      return s;
+    });
+    toast('Registro excluído e estatísticas recalculadas. Publique novamente para atualizar a visão pública.');
+  }
 
   function registerTeamPoint(team) {
     update(s => {
@@ -769,7 +787,7 @@ export function useTournament(eventId) {
   return {
     state, teams, eligibleTeams, playersOfTeam, getStats, playerName, isTeamEligible,
     addPlayer, updatePlayer, deletePlayer, applyPlayerImport, resetTournament, addTeam, renameTeam, deleteTeam, assignPlayerToTeam,
-    saveGroups, generateBracket, generateGroupPhase, generateDoubleElimination, groupStandings, updateBracketMatch, moveBracketMatch, undoBracketMatchResult, deleteBracketMatch,
+    saveGroups, generateBracket, generateGroupPhase, generateDoubleElimination, groupStandings, updateBracketMatch, moveBracketMatch, undoBracketMatchResult, deleteBracketMatch, deleteHistoryMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, publishFinalAwards, publicationPending, activateSync, pushNow, setMatchPractice,
     exportBackup, importBackup,
@@ -880,6 +898,46 @@ function snapshotMatch(match) {
 
 function decrementStat(stats, key) {
   if (stats && stats[key] > 0) stats[key] -= 1;
+}
+
+function rebuildTournamentAggregates(state) {
+  const history = Array.isArray(state.history) ? state.history : [];
+  const roster = Array.isArray(state.roster) ? state.roster : [];
+  const playerStats = {};
+  const ensurePlayer = id => {
+    if (!id) return null;
+    if (!playerStats[id]) playerStats[id] = emptyStats();
+    return playerStats[id];
+  };
+  roster.forEach(player => ensurePlayer(player.id));
+  history.forEach(match => {
+    Object.keys(match.matchStats || {}).forEach(ensurePlayer);
+    ensurePlayer(match.mvpId);
+  });
+  const teamNames = new Set([
+    ...(state.teamEntries || []),
+    ...roster.map(player => player.team),
+    ...Object.keys(state.standings || {}),
+    ...history.flatMap(match => [match.teamA, match.teamB])
+  ].filter(Boolean));
+  const standings = Object.fromEntries([...teamNames].map(team => [team, 0]));
+  history.filter(match => !match.isPractice).forEach(match => {
+    Object.entries(match.matchStats || {}).forEach(([playerId, stats]) => {
+      const aggregate = ensurePlayer(playerId);
+      Object.entries(stats || {}).forEach(([key, value]) => {
+        if (Object.prototype.hasOwnProperty.call(aggregate, key)) {
+          const amount = Number(value);
+          if (Number.isFinite(amount)) aggregate[key] += amount;
+        }
+      });
+    });
+    const mvp = match.mvpId || (roster.find(player => player.name === match.mvpName) || {}).id;
+    const mvpStats = ensurePlayer(mvp);
+    if (mvpStats) mvpStats.mvp += 1;
+    if (match.winner && Object.prototype.hasOwnProperty.call(standings, match.winner)) standings[match.winner] += 1;
+  });
+  state.playerStats = playerStats;
+  state.standings = standings;
 }
 
 function currentEventName(eventId) {

@@ -63,9 +63,13 @@ export async function logoutAdmin() {
 }
 
 export function buildPublicSnapshot(teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false, publicScoutingEnabled = true) {
+  const officialWins = Object.fromEntries(teams.map(team => [team, 0]));
+  history.filter(match => !match.isPractice && match.winner).forEach(match => {
+    if (Object.prototype.hasOwnProperty.call(officialWins, match.winner)) officialWins[match.winner] += 1;
+  });
   return {
     updatedAt: new Date().toISOString(),
-    standings: teams.map(team => ({ name: team, wins: standings[team] || 0 })).sort((a, b) => b.wins - a.wins),
+    standings: teams.map(team => ({ name: team, wins: officialWins[team] })).sort((a, b) => b.wins - a.wins),
     matches: history.map(match => ({
       teamA: match.teamA, teamB: match.teamB,
       setsWonA: match.setsWonA, setsWonB: match.setsWonB, winner: match.winner, isPractice: match.isPractice === true
@@ -138,7 +142,8 @@ export async function fetchRegistryList(registryId) {
   return backendJson('/api/tournament-public?' + query.toString());
 }
 
-export async function fetchPublicSnapshot(binId) {
+export async function fetchPublicSnapshot(binId, { fresh = false } = {}) {
   const query = new URLSearchParams({ tournament: binId });
-  return backendJson('/api/tournament-public?' + query.toString());
+  if (fresh) query.set('fresh', '1');
+  return backendJson('/api/tournament-public?' + query.toString(), fresh ? { cache: 'no-store' } : {});
 }

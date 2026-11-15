@@ -77,7 +77,7 @@ export default function PublicViewer({ onSwitchRole }) {
     setSnapshotLoading(true);
     setSnapshotError(false);
     try {
-      const record = await fetchPublicSnapshot(selected.binId);
+      const record = await fetchPublicSnapshot(selected.binId, { fresh: true });
       if (record) setSnapshot(record);
       else setSnapshotError(true);
     } catch (e) {

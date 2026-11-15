@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { hasAdminSession, jsonResponse, sameOrigin } from '../server/adminAuth.js';
 import { supabaseRequest } from '../server/supabase.js';
 
-const PUBLIC_CACHE = 'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
-function cachedJson(data, status = 200) {
-  return jsonResponse(data, status, { 'Cache-Control': PUBLIC_CACHE });
+const PUBLIC_CACHE = 'public, max-age=0, s-maxage=10';
+const FRESH_CACHE = 'no-store';
+function cachedJson(data, status = 200, fresh = false) {
+  return jsonResponse(data, status, { 'Cache-Control': fresh ? FRESH_CACHE : PUBLIC_CACHE });
 }
 
 export default {
@@ -20,10 +21,11 @@ export default {
         }
         const id = url.searchParams.get('tournament');
         if (!id) return jsonResponse({ error: 'Tournament identifier is required.' }, 400);
+        const fresh = url.searchParams.get('fresh') === '1';
         const query = new URLSearchParams({ select: 'snapshot,updated_at', id: 'eq.' + id, limit: '1' }).toString();
         const rows = await supabaseRequest('tournament_snapshots?' + query);
-        if (!rows.length) return cachedJson({ error: 'Tournament snapshot not found.' }, 404);
-        return cachedJson({ ...rows[0].snapshot, updatedAt: rows[0].updated_at || rows[0].snapshot.updatedAt });
+        if (!rows.length) return cachedJson({ error: 'Tournament snapshot not found.' }, 404, fresh);
+        return cachedJson({ ...rows[0].snapshot, updatedAt: rows[0].updated_at || rows[0].snapshot.updatedAt }, 200, fresh);
       } catch {
         return jsonResponse({ error: 'Could not load tournament data from Supabase.' }, 502);
       }

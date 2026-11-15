@@ -117,6 +117,10 @@ export default function Historico({ t, eventId, eventName }) {
           <button className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={() => t.setMatchPractice(index, !m.isPractice)}>
             {m.isPractice ? 'Contabilizar como jogo oficial' : 'Marcar como jogo-treino'}
           </button>
+          <button className="btn btn-danger btn-block" style={{ marginTop: 8 }} onClick={() => {
+            const dependentWarning = m.bracketMatchId ? ' Os jogos seguintes que dependem dela também serão reiniciados.' : '';
+            if (window.confirm('Excluir este registro e apagar os dados da partida? As estatísticas e a classificação serão recalculadas com os jogos restantes.' + dependentWarning)) t.deleteHistoryMatch(index);
+          }}>Excluir jogo e apagar dados</button>
         </div>
       ))}
       {previewTab && <div className="overlay" onClick={() => setPreviewTab(null)}>
