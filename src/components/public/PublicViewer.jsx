@@ -50,6 +50,13 @@ export default function PublicViewer({ onSwitchRole }) {
   }, [registryId, screen]);
 
   useEffect(() => {
+    if (snapshot && snapshot.publicScoutingEnabled === false && tab === 'scouting') {
+      setTab('times');
+      updateViewerUrl(registryId, selected && selected.binId, 'times');
+    }
+  }, [snapshot, tab, registryId, selected]);
+
+  useEffect(() => {
     if (screen !== 'tournament' || !selected) return;
     let alive = true;
     async function load() {
@@ -108,7 +115,7 @@ export default function PublicViewer({ onSwitchRole }) {
             <button type="button" className={`tab ${tab === 'times' ? 'active' : ''}`} onClick={() => changeTab('times')}>Classificação</button>
             <button type="button" className={`tab ${tab === 'equipes' ? 'active' : ''}`} onClick={() => changeTab('equipes')}>Times</button>
             <button type="button" className={`tab ${tab === 'jogos' ? 'active' : ''}`} onClick={() => changeTab('jogos')}>Próximos jogos</button>
-            <button type="button" className={`tab ${tab === 'scouting' ? 'active' : ''}`} onClick={() => changeTab('scouting')}>Scouting</button>
+            {snapshot?.publicScoutingEnabled !== false && <button type="button" className={`tab ${tab === 'scouting' ? 'active' : ''}`} onClick={() => changeTab('scouting')}>Scouting</button>}
             {snapshot && snapshot.publicAwardsEnabled && <button type="button" className={`tab ${tab === 'premios' ? 'active' : ''}`} onClick={() => changeTab('premios')}>Premiações</button>}
           </div>
           <div className="content" style={{ paddingTop: 0, paddingBottom: 0 }}>
@@ -120,7 +127,7 @@ export default function PublicViewer({ onSwitchRole }) {
           <div className="content">
             {snapshotLoading && !snapshot
               ? <div className="empty"><div className="big">🏐</div>Carregando resultados…</div>
-              : tab === 'premios' ? <PublicAwardsView snapshot={snapshot} /> : tab === 'times' ? <StandingsView snapshot={snapshot} /> : tab === 'equipes' ? <PublicTeamsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
+              : tab === 'premios' ? <PublicAwardsView snapshot={snapshot} /> : tab === 'times' || (tab === 'scouting' && snapshot?.publicScoutingEnabled === false) ? <StandingsView snapshot={snapshot} /> : tab === 'equipes' ? <PublicTeamsView snapshot={snapshot} /> : tab === 'jogos' ? <ScheduleView snapshot={snapshot} /> : <ScoutingView snapshot={snapshot} tournamentId={selected.binId} />}
           </div>
         </>
       ) : (

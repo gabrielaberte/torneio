@@ -66,6 +66,11 @@ export default function Historico({ t, eventId }) {
       <div className="card">
         <h3>Publicar resultados (Supabase)</h3>
         <div className="muted" style={{ marginBottom: 10 }}>A publicação pública é salva no Supabase e fica disponível pelo link fixo do torneio.</div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none', letterSpacing: 0, color: 'var(--navy)' }}>
+          <input type="checkbox" checked={t.state.publicScoutingEnabled !== false} onChange={event => t.setPublicScoutingEnabled(event.target.checked)} />
+          Exibir Scouting no modo úblico
+        </label>
+        <div className="muted" style={{ marginTop: 6 }}>Depois de alterar, clique em Publicar placar para atualizar o link úblico.</div>
         <label>Link do site publicado (Vercel)</label>
         <input type="text" placeholder="https://seu-projeto.vercel.app" value={viewerUrl} onChange={e => setViewerUrlState(e.target.value)} />
         <button className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={saveUrl}>Salvar link do site</button>

@@ -62,7 +62,7 @@ export async function logoutAdmin() {
   await authRequest('DELETE');
 }
 
-export function buildPublicSnapshot(teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false) {
+export function buildPublicSnapshot(teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false, publicScoutingEnabled = true) {
   return {
     updatedAt: new Date().toISOString(),
     standings: teams.map(team => ({ name: team, wins: standings[team] || 0 })).sort((a, b) => b.wins - a.wins),
@@ -77,6 +77,7 @@ export function buildPublicSnapshot(teams, standings, history, bracket, current,
     })),
     scoutingPlayers: (roster || []).map(projectScoutingPlayer),
     publicAwardsEnabled: publicAwardsEnabled === true,
+    publicScoutingEnabled: publicScoutingEnabled !== false,
     scoringPlayers: publicAwardsEnabled ? (roster || []).map(player => ({
       id: String(player.id || ''), name: String(player.name || ''), team: String(player.team || ''), gender: String(player.gender || ''),
       stats: Object.fromEntries(PUBLIC_STAT_KEYS.map(key => [key, Number(playerStats[player.id] && playerStats[player.id][key]) || 0]))
@@ -90,8 +91,8 @@ export function buildPublicSnapshot(teams, standings, history, bracket, current,
   };
 }
 
-export async function publishSnapshot(eventName, eventBinId, registryId, teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false) {
-  const snapshot = buildPublicSnapshot(teams, standings, history, bracket, current, roster, playerStats, publicAwardsEnabled);
+export async function publishSnapshot(eventName, eventBinId, registryId, teams, standings, history, bracket, current, roster = [], playerStats = {}, publicAwardsEnabled = false, publicScoutingEnabled = true) {
+  const snapshot = buildPublicSnapshot(teams, standings, history, bracket, current, roster, playerStats, publicAwardsEnabled, publicScoutingEnabled);
   return backendJson('/api/tournament-public', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

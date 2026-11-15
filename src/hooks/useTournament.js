@@ -74,7 +74,7 @@ export function useTournament(eventId) {
         const currentTeams = Array.from(new Set([...(current.teamEntries || []), ...(current.roster || []).map(player => player.team)].filter(Boolean))).sort();
         const { eventBinId, registryId } = await cloudPublish(
           currentEventName(eventId), current.jsonbin.id, getRegistryId(), currentTeams,
-          current.standings || {}, current.history || [], current.bracket, current.current, current.roster || [], current.playerStats || {}, current.publicAwardsEnabled === true
+          current.standings || {}, current.history || [], current.bracket, current.current, current.roster || [], current.playerStats || {}, current.publicAwardsEnabled === true, current.publicScoutingEnabled !== false
         );
         setRegistryId(registryId);
         update(s => { s.jsonbin = { id: eventBinId }; return s; });
@@ -647,7 +647,7 @@ export function useTournament(eventId) {
     try {
       const { eventBinId, registryId } = await cloudPublish(
         currentEventName(eventId), state.jsonbin.id, getRegistryId(),
-        teams, state.standings, state.history, state.bracket, state.current, state.roster, state.playerStats, state.publicAwardsEnabled === true
+        teams, state.standings, state.history, state.bracket, state.current, state.roster, state.playerStats, state.publicAwardsEnabled === true, state.publicScoutingEnabled !== false
       );
       setRegistryId(registryId);
       update(s => { s.jsonbin = { id: eventBinId }; return s; });
@@ -676,7 +676,7 @@ export function useTournament(eventId) {
     try {
       const { eventBinId, registryId } = await cloudPublish(
         currentEventName(eventId), state.jsonbin.id, getRegistryId(), teams,
-        state.standings, state.history, state.bracket, state.current, state.roster, state.playerStats, true
+        state.standings, state.history, state.bracket, state.current, state.roster, state.playerStats, true, state.publicScoutingEnabled !== false
       );
       setRegistryId(registryId);
       update(s => { s.publicAwardsEnabled = true; s.jsonbin = { id: eventBinId }; return s; });
@@ -725,6 +725,8 @@ export function useTournament(eventId) {
     }
   }
 
+  function setPublicScoutingEnabled(enabled) { update(s => { s.publicScoutingEnabled = enabled; return s; }); }
+
   function setModal(modal) { update(s => { s.modal = modal; return s; }); }
 
   return {
@@ -734,7 +736,7 @@ export function useTournament(eventId) {
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
     publish, publishFinalAwards, publicationPending, activateSync, pushNow,
     exportBackup, importBackup,
-    setModal
+    setPublicScoutingEnabled, setModal
   };
 }
 

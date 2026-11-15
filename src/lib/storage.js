@@ -8,6 +8,7 @@ export function defaultState() {
     standings: {},
     history: [],
     publicAwardsEnabled: false,
+    publicScoutingEnabled: true,
     bracket: { groupA: [], groupB: [], matches: [] },
     current: null,
     modal: null,
