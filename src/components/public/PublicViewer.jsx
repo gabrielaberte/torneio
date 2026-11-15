@@ -204,7 +204,7 @@ export function StandingsView({ snapshot }) {
         <div className="muted" style={{ marginBottom: 10 }}>Os confrontos e seus resultados mostram quem chegou à final.</div>
         {playoffMatches.map((match, index) => <div className="match-row" key={match.id || index}>
           <b>{match.phase}:</b> {match.teamA} {match.status === 'done' ? `${match.setsWonA ?? 0}×${match.setsWonB ?? 0}` : '×'} {match.teamB}
-          {match.status === 'done' && match.winner
+          {match.isPractice ? <span className="muted"> · Treino (fora da classificação)</span> : match.status === 'done' && match.winner
             ? <> · <span className="win">Vencedor: {match.winner}</span></>
             : <span className="muted"> · {match.status === 'live' ? 'Em andamento' : 'Agendado'}</span>}
         </div>)}
@@ -214,7 +214,7 @@ export function StandingsView({ snapshot }) {
         <div className="card">
           <h3 style={{ marginBottom: 10 }}>Últimos resultados</h3>
           {[...snapshot.matches].reverse().slice(0, 8).map((m, i) => (
-            <div key={i} className="match-row">{m.teamA} {m.setsWonA}×{m.setsWonB} {m.teamB} — <span className="win">{m.winner}</span></div>
+            <div key={i} className="match-row">{m.teamA} {m.setsWonA}×{m.setsWonB} {m.teamB} — {m.isPractice ? <span className="muted">Treino (fora das estatísticas)</span> : <span className="win">{m.winner}</span>}</div>
           ))}
         </div>
       )}

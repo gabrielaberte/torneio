@@ -10,12 +10,16 @@ export default function Jogo({ t }) {
   const [teamB, setTeamB] = useState(t.teams[1] || '');
   const [bestOf, setBestOf] = useState(3);
   const [targetSel, setTargetSel] = useState('25');
+  const [decidingTargetSel, setDecidingTargetSel] = useState('same');
+  const [customDecidingTarget, setCustomDecidingTarget] = useState('');
+  const [isPractice, setIsPractice] = useState(false);
   const [customTarget, setCustomTarget] = useState('');
   const [bracketMatchId, setBracketMatchId] = useState('');
   const [modal, setModal] = useState(null); // null | 'pickType' | {step:'pickPlayer',evt} | {step:'pickReceiver',opponentTeam}
   const [mvpId, setMvpId] = useState('');
 
   const m = t.state.current;
+  const currentSetTarget = m && m.bestOf > 1 && m.sets.length === m.bestOf - 1 ? (m.decidingTarget || m.target) : m && m.target;
 
   if (t.teams.length < 2) {
     return <div className="empty"><div className="big">🙋</div>Cadastre pelo menos 2 times na aba <b>Elenco</b> antes de iniciar um jogo.</div>;
@@ -58,24 +62,45 @@ export default function Jogo({ t }) {
           <option value={1}>1 set</option>
           <option value={5}>5 sets</option>
         </select>
-        <label>Pontos por set</label>
+        <label>Pontos nos sets normais</label>
         <select value={targetSel} onChange={e => setTargetSel(e.target.value)}>
           <option value="15">15 pontos</option>
           <option value="21">21 pontos</option>
           <option value="25">25 pontos</option>
-          <option value="custom">Outro valor…</option>
+          <option value="custom">Outro valor...</option>
         </select>
         {targetSel === 'custom' && (
           <div style={{ marginTop: 8 }}>
             <input type="text" inputMode="numeric" placeholder="Ex: 12" value={customTarget} onChange={e => setCustomTarget(e.target.value)} />
           </div>
         )}
+        {bestOf > 1 && <>
+          <label>Pontos no set decisivo</label>
+          <select value={decidingTargetSel} onChange={e => setDecidingTargetSel(e.target.value)}>
+            <option value="same">Igual aos sets normais</option>
+            <option value="15">15 pontos</option>
+            <option value="21">21 pontos</option>
+            <option value="25">25 pontos</option>
+            <option value="custom">Outro valor...</option>
+          </select>
+          {decidingTargetSel === 'custom' && (
+            <div style={{ marginTop: 8 }}>
+              <input type="text" inputMode="numeric" placeholder="Ex: 12" value={customDecidingTarget} onChange={e => setCustomDecidingTarget(e.target.value)} />
+            </div>
+          )}
+        </>}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none', letterSpacing: 0, color: 'var(--navy)' }}>
+          <input type="checkbox" checked={isPractice} onChange={event => setIsPractice(event.target.checked)} />
+          Jogo-treino (nao contar nas estatisticas)
+        </label>
         <button className="btn btn-primary btn-block" style={{ marginTop: 16 }} onClick={() => {
           if (teamA === teamB) { toast('Escolha times diferentes'); return; }
           if (!t.isTeamEligible(teamA) || !t.isTeamEligible(teamB)) { toast('Cada time precisa ter exatamente 6 jogadores com inscrição válida para jogar.'); return; }
           const target = targetSel === 'custom' ? parseInt(customTarget, 10) : parseInt(targetSel, 10);
-          if (!target || target < 1) { toast('Informe um número válido de pontos por set'); return; }
-          t.startMatch({ teamA, teamB, bestOf, target, bracketMatchId: bracketMatchId || null });
+          const decidingTarget = bestOf === 1 || decidingTargetSel === 'same' ? target : decidingTargetSel === 'custom' ? parseInt(customDecidingTarget, 10) : parseInt(decidingTargetSel, 10);
+          if (!target || target < 1 || !decidingTarget || decidingTarget < 1) { toast('Informe uma pontuacao valida para cada set'); return; }
+          t.startMatch({ teamA, teamB, bestOf, target, decidingTarget, bracketMatchId: isPractice ? null : bracketMatchId || null, isPractice });
+          setIsPractice(false);
         }}>Iniciar jogo</button>
       </div>
     );
@@ -135,7 +160,8 @@ export default function Jogo({ t }) {
           {m.sets.length ? m.sets.map((s, i) => <div key={i} className="set-pill">Set {i + 1}: {s.a}–{s.b}</div>)
             : <div className="set-pill">Primeiro set em andamento</div>}
         </div>
-        <div className="sb-sets">Sets: {m.teamA} {m.setsWonA} × {m.setsWonB} {m.teamB} · melhor de {m.bestOf} · até {m.target} pts</div>
+        <div className="sb-sets">Sets: {m.teamA} {m.setsWonA}-{m.setsWonB} {m.teamB} | melhor de {m.bestOf} | este set: {currentSetTarget} pts</div>
+        {m.isPractice && <div className="muted" style={{ textAlign: "center", marginTop: 6 }}>Jogo-treino: fora das estatisticas e da classificacao.</div>}
       </div>
 
       <div className="card">

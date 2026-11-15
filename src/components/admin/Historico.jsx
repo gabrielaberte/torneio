@@ -108,11 +108,15 @@ export default function Historico({ t, eventId, eventName }) {
         <div className="muted" style={{ marginBottom: 10 }}>Apaga o elenco, times, estatísticas, partidas, placares e chaveamento deste torneio. Os links de publicação e sincronização são mantidos para você continuar usando o torneio vazio.</div>
         <button className="btn btn-danger btn-block" onClick={doResetTournament}>Apagar dados e começar do zero</button>
       </div>
-      {t.state.history.length === 0 ? <div className="empty"><div className="big">🗒️</div>Nenhuma partida finalizada ainda.</div> : [...t.state.history].reverse().map((m, i) => (
-        <div key={i} className="card">
-          <h3>{m.teamA} {m.setsWonA} × {m.setsWonB} {m.teamB}</h3>
-          <div className="muted">Sets: {m.sets.map(s => `${s.a}-${s.b}`).join(' · ')}</div>
-          <div className="muted" style={{ marginTop: 6 }}>Vencedor: <b>{m.winner}</b> · MVP: <b>{m.mvpName || '—'}</b></div>
+      {t.state.history.length === 0 ? <div className="empty">Nenhuma partida finalizada ainda.</div> : t.state.history.map((match, index) => ({ match, index })).reverse().map(({ match: m, index }) => (
+        <div key={m.bracketMatchId || index} className="card">
+          <h3>{m.teamA} {m.setsWonA} x {m.setsWonB} {m.teamB}</h3>
+          <div className="muted">Sets: {(m.sets || []).map(set => `${set.a}-${set.b}`).join(' | ')}</div>
+          <div className="muted" style={{ marginTop: 6 }}>Vencedor: <b>{m.winner}</b> | MVP: <b>{m.mvpName || '--'}</b></div>
+          {m.isPractice && <div className="muted" style={{ marginTop: 8 }}>Jogo-treino; fora das estatisticas e da classificacao.</div>}
+          <button className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={() => t.setMatchPractice(index, !m.isPractice)}>
+            {m.isPractice ? 'Contabilizar como jogo oficial' : 'Marcar como jogo-treino'}
+          </button>
         </div>
       ))}
       {previewTab && <div className="overlay" onClick={() => setPreviewTab(null)}>

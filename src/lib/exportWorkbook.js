@@ -48,9 +48,9 @@ function buildGamesRows(state) {
   if (current && !current.bracketMatchId) games.push({ ...current, status: 'live', isCurrent: true });
 
   const headers = [
-    'Jogo', 'Fase', 'Status', 'Time A', 'Time B', 'Vencedor',
-    'Sets do Time A', 'Sets do Time B', 'Parciais dos sets', 'Data agendada',
-    'MVP', 'Atleta', 'Time do atleta', ...STAT_FIELDS.map(field => field[1])
+    'Jogo', 'Fase', 'Status', 'Tipo', 'Time A', 'Time B', 'Vencedor',
+    'Sets do Time A', 'Sets do Time B', 'Melhor de', 'Pontos sets normais', 'Pontos set decisivo',
+    'Parciais dos sets', 'Data agendada', 'MVP', 'Atleta', 'Time do atleta', ...STAT_FIELDS.map(field => field[1])
   ];
   const rows = [headers];
   games.forEach((game, index) => {
@@ -63,10 +63,10 @@ function buildGamesRows(state) {
     entries.forEach(player => {
       const stats = player && game.matchStats ? (game.matchStats[player.id] || {}) : {};
       rows.push([
-        index + 1, game.phase || '', statusLabel(game, game.isCurrent),
+        index + 1, game.phase || '', statusLabel(game, game.isCurrent), game.isPractice ? 'Treino' : 'Oficial',
         game.teamA || '', game.teamB || '', game.winner || '',
-        game.setsWonA ?? '', game.setsWonB ?? '', partials.join(' | '),
-        game.scheduledAt || '', game.mvpName || '',
+        game.setsWonA ?? '', game.setsWonB ?? '', game.bestOf ?? '', game.target ?? '', game.decidingTarget ?? game.target ?? '',
+        partials.join(' | '), game.scheduledAt || '', game.mvpName || '',
         player ? player.name : '', player ? player.team : '',
         ...STAT_FIELDS.map(([key]) => number(stats[key]))
       ]);
@@ -156,7 +156,7 @@ export async function downloadTournamentWorkbook({ eventName, state, teams, grou
 
   const gamesRows = buildGamesRows(state);
   const gamesSheet = XLSX.utils.aoa_to_sheet(gamesRows);
-  gamesSheet['!cols'] = columnsFor([8, 20, 22, 24, 24, 24, 14, 14, 28, 22, 24, 28, 24, ...STAT_FIELDS.map(() => 16)]);
+  gamesSheet['!cols'] = columnsFor([8, 20, 22, 14, 24, 24, 24, 14, 14, 12, 18, 20, 28, 22, 24, 28, 24, ...STAT_FIELDS.map(() => 16)]);
   if (gamesRows.length > 1) gamesSheet['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: gamesRows.length - 1, c: gamesRows[0].length - 1 } }) };
   XLSX.utils.book_append_sheet(workbook, gamesSheet, 'Jogos');
 

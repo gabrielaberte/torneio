@@ -68,12 +68,12 @@ export function buildPublicSnapshot(teams, standings, history, bracket, current,
     standings: teams.map(team => ({ name: team, wins: standings[team] || 0 })).sort((a, b) => b.wins - a.wins),
     matches: history.map(match => ({
       teamA: match.teamA, teamB: match.teamB,
-      setsWonA: match.setsWonA, setsWonB: match.setsWonB, winner: match.winner
+      setsWonA: match.setsWonA, setsWonB: match.setsWonB, winner: match.winner, isPractice: match.isPractice === true
     })),
     schedule: ((bracket && bracket.matches) || []).map(match => ({
       id: match.id, phase: match.phase, teamA: match.teamA, teamB: match.teamB,
       scheduledAt: match.scheduledAt, status: match.status, winner: match.winner,
-      setsWonA: match.setsWonA, setsWonB: match.setsWonB
+      setsWonA: match.setsWonA, setsWonB: match.setsWonB, isPractice: match.isPractice === true
     })),
     scoutingPlayers: (roster || []).map(projectScoutingPlayer),
     publicAwardsEnabled: publicAwardsEnabled === true,

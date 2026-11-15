@@ -262,11 +262,11 @@ export function useTournament(eventId) {
     return { inserted, updated, ignored: selections.length - selected.length, conflicts: 0 };
   }
   /* ---------- Jogo ao vivo ---------- */
-  function startMatch({ teamA, teamB, bestOf, target, bracketMatchId = null }) {
+  function startMatch({ teamA, teamB, bestOf, target, decidingTarget = target, bracketMatchId = null, isPractice = false }) {
     update(s => {
-      s.current = { teamA, teamB, bestOf, target, bracketMatchId, sets: [], setsWonA: 0, setsWonB: 0, currentSet: { a: 0, b: 0 }, log: [], matchStats: {}, undoStack: [] };
+      s.current = { teamA, teamB, bestOf, target, decidingTarget, bracketMatchId, isPractice: Boolean(isPractice), sets: [], setsWonA: 0, setsWonB: 0, currentSet: { a: 0, b: 0 }, log: [], matchStats: {}, undoStack: [] };
       if (bracketMatchId && s.bracket && s.bracket.matches) {
-        s.bracket.matches = s.bracket.matches.map(match => match.id === bracketMatchId ? { ...match, status: 'live' } : match);
+        s.bracket.matches = s.bracket.matches.map(match => match.id === bracketMatchId ? { ...match, status: 'live', target, decidingTarget, bestOf, isPractice: Boolean(isPractice) } : match);
       }
       return s;
     });
@@ -300,14 +300,16 @@ export function useTournament(eventId) {
         receiverId: null
       });
 
-      if (!s.playerStats[playerId]) s.playerStats[playerId] = emptyStats();
       if (!m.matchStats[playerId]) m.matchStats[playerId] = emptyStats();
-      s.playerStats[playerId][ev.stat] += 1;
+      if (!m.isPractice) {
+        if (!s.playerStats[playerId]) s.playerStats[playerId] = emptyStats();
+        s.playerStats[playerId][ev.stat] += 1;
+      }
       m.matchStats[playerId][ev.stat] += 1;
 
       if (scoringTeam === m.teamA) m.currentSet.a += 1; else m.currentSet.b += 1;
       if (ev.point === 'self') {
-        s.playerStats[playerId].points += 1;
+        if (!m.isPractice) s.playerStats[playerId].points += 1;
         m.matchStats[playerId].points += 1;
       }
 
@@ -479,8 +481,7 @@ export function useTournament(eventId) {
       }
 
       const revertResult = match => {
-        if (!match || !match.winner) return;
-        s.standings[match.winner] = Math.max(0, (s.standings[match.winner] || 0) - 1);
+        if (!match) return;
         let historyIndex = -1;
         for (let i = s.history.length - 1; i >= 0; i -= 1) {
           const item = s.history[i];
@@ -489,8 +490,13 @@ export function useTournament(eventId) {
             : item.teamA === match.teamA && item.teamB === match.teamB && item.winner === match.winner;
           if (sameMatch) { historyIndex = i; break; }
         }
-        if (historyIndex < 0) return;
+        if (historyIndex < 0) {
+          if (match.winner && !match.isPractice) s.standings[match.winner] = Math.max(0, (s.standings[match.winner] || 0) - 1);
+          return;
+        }
         const [historyItem] = s.history.splice(historyIndex, 1);
+        if (historyItem.isPractice || match.isPractice) return;
+        if (match.winner) s.standings[match.winner] = Math.max(0, (s.standings[match.winner] || 0) - 1);
         Object.entries(historyItem.matchStats || {}).forEach(([playerId, stats]) => {
           const playerStats = s.playerStats[playerId];
           if (!playerStats) return;
@@ -554,9 +560,11 @@ export function useTournament(eventId) {
     update(s => {
       const m = s.current;
       if (receiverId) {
-        if (!s.playerStats[receiverId]) s.playerStats[receiverId] = emptyStats();
         if (!m.matchStats[receiverId]) m.matchStats[receiverId] = emptyStats();
-        s.playerStats[receiverId].mishits += 1;
+        if (!m.isPractice) {
+          if (!s.playerStats[receiverId]) s.playerStats[receiverId] = emptyStats();
+          s.playerStats[receiverId].mishits += 1;
+        }
         m.matchStats[receiverId].mishits += 1;
         const lastPoint = m.undoStack[m.undoStack.length - 1];
         if (lastPoint) lastPoint.receiverId = receiverId;
@@ -576,15 +584,15 @@ export function useTournament(eventId) {
       const lastPoint = m.undoStack.pop();
 
       if (lastPoint.playerId && lastPoint.stat) {
-        decrementStat(s.playerStats[lastPoint.playerId], lastPoint.stat);
+        if (!m.isPractice) decrementStat(s.playerStats[lastPoint.playerId], lastPoint.stat);
         decrementStat(m.matchStats[lastPoint.playerId], lastPoint.stat);
       }
       if (lastPoint.playerId && lastPoint.addsPoint) {
-        decrementStat(s.playerStats[lastPoint.playerId], 'points');
+        if (!m.isPractice) decrementStat(s.playerStats[lastPoint.playerId], 'points');
         decrementStat(m.matchStats[lastPoint.playerId], 'points');
       }
       if (lastPoint.receiverId) {
-        decrementStat(s.playerStats[lastPoint.receiverId], 'mishits');
+        if (!m.isPractice) decrementStat(s.playerStats[lastPoint.receiverId], 'mishits');
         decrementStat(m.matchStats[lastPoint.receiverId], 'mishits');
       }
 
@@ -598,7 +606,7 @@ export function useTournament(eventId) {
     const m = s.current;
     if (!m) return;
     const setsToWin = Math.ceil(m.bestOf / 2);
-    const target = m.target;
+    const target = m.bestOf > 1 && m.sets.length === m.bestOf - 1 ? (Number(m.decidingTarget) || m.target) : m.target;
     const { a, b } = m.currentSet;
     const diff = Math.abs(a - b);
     if ((a >= target && diff >= 2) || (b >= target && diff >= 2)) {
@@ -618,14 +626,16 @@ export function useTournament(eventId) {
   function finalizeMatch(mvpId) {
     update(s => {
       const m = s.current;
-      if (!s.playerStats[mvpId]) s.playerStats[mvpId] = emptyStats();
-      s.playerStats[mvpId].mvp += 1;
-      s.standings[m.winner] = (s.standings[m.winner] || 0) + 1;
+      if (!m.isPractice) {
+        if (!s.playerStats[mvpId]) s.playerStats[mvpId] = emptyStats();
+        s.playerStats[mvpId].mvp += 1;
+        s.standings[m.winner] = (s.standings[m.winner] || 0) + 1;
+      }
       const mvpName = (s.roster.find(p => p.id === mvpId) || {}).name || 'â€”';
-      s.history.push({ bracketMatchId: m.bracketMatchId || null, mvpId, matchStats: m.matchStats, teamA: m.teamA, teamB: m.teamB, sets: m.sets, setsWonA: m.setsWonA, setsWonB: m.setsWonB, winner: m.winner, mvpName });
+      s.history.push({ bracketMatchId: m.bracketMatchId || null, mvpId, matchStats: m.matchStats, teamA: m.teamA, teamB: m.teamB, sets: m.sets, setsWonA: m.setsWonA, setsWonB: m.setsWonB, winner: m.winner, mvpName, isPractice: Boolean(m.isPractice), target: m.target, decidingTarget: m.decidingTarget, bestOf: m.bestOf });
       if (m.bracketMatchId && s.bracket && s.bracket.matches) {
         s.bracket.matches = s.bracket.matches.map(match => match.id === m.bracketMatchId
-          ? { ...match, status: 'done', winner: m.winner, setsWonA: m.setsWonA, setsWonB: m.setsWonB, sets: m.sets }
+          ? { ...match, status: 'done', winner: m.winner, setsWonA: m.setsWonA, setsWonB: m.setsWonB, sets: m.sets, isPractice: Boolean(m.isPractice), target: m.target, decidingTarget: m.decidingTarget, bestOf: m.bestOf }
           : match);
         resolveBracketProgression(s.bracket.matches);
       }
@@ -637,6 +647,33 @@ export function useTournament(eventId) {
   }
 
   /* ---------- Nuvem: publicação pública + sincronização privada ---------- */
+  function setMatchPractice(historyIndex, isPractice) {
+    update(s => {
+      const match = s.history[historyIndex];
+      if (!match || Boolean(match.isPractice) === Boolean(isPractice)) return s;
+      const direction = isPractice ? -1 : 1;
+      Object.entries(match.matchStats || {}).forEach(([playerId, stats]) => {
+        if (direction > 0 && !s.playerStats[playerId]) s.playerStats[playerId] = emptyStats();
+        if (!s.playerStats[playerId]) return;
+        Object.entries(stats || {}).forEach(([key, value]) => {
+          s.playerStats[playerId][key] = Math.max(0, (s.playerStats[playerId][key] || 0) + direction * (Number(value) || 0));
+        });
+      });
+      const mvpId = match.mvpId || (s.roster.find(player => player.name === match.mvpName) || {}).id;
+      if (mvpId) {
+        if (direction > 0 && !s.playerStats[mvpId]) s.playerStats[mvpId] = emptyStats();
+        if (s.playerStats[mvpId]) s.playerStats[mvpId].mvp = Math.max(0, (s.playerStats[mvpId].mvp || 0) + direction);
+      }
+      if (match.winner) s.standings[match.winner] = Math.max(0, (s.standings[match.winner] || 0) + direction);
+      match.isPractice = Boolean(isPractice);
+      if (match.bracketMatchId && s.bracket && Array.isArray(s.bracket.matches)) {
+        s.bracket.matches = s.bracket.matches.map(item => item.id === match.bracketMatchId ? { ...item, isPractice: Boolean(isPractice) } : item);
+      }
+      return s;
+    });
+    toast(isPractice ? 'Partida marcada como treino; dados fora das estatisticas. Publique o placar para atualizar o link publico.' : 'Partida contabilizada; estatisticas atualizadas. Publique o placar para atualizar o link publico.');
+  }
+
   async function publish(isAutomaticRetry = false) {
     if (!navigator.onLine) {
       markPublicationPending(eventId);
@@ -734,7 +771,7 @@ export function useTournament(eventId) {
     addPlayer, updatePlayer, deletePlayer, applyPlayerImport, resetTournament, addTeam, renameTeam, deleteTeam, assignPlayerToTeam,
     saveGroups, generateBracket, generateGroupPhase, generateDoubleElimination, groupStandings, updateBracketMatch, moveBracketMatch, undoBracketMatchResult, deleteBracketMatch,
     startMatch, cancelMatch, registerEvent, registerTeamPoint, chooseReceiver, undoLastPoint, finalizeMatch,
-    publish, publishFinalAwards, publicationPending, activateSync, pushNow,
+    publish, publishFinalAwards, publicationPending, activateSync, pushNow, setMatchPractice,
     exportBackup, importBackup,
     setPublicScoutingEnabled, setModal
   };
@@ -813,7 +850,7 @@ function buildBracketMatches(groupA, groupB) {
 
 function calculateGroupStandings(teams, matches) {
   const rows = Object.fromEntries(teams.map(name => [name, { name, points: 0, wins: 0, pointDiff: 0, head: {}, played: 0 }]));
-  matches.filter(match => match.phase === 'Fase de grupos' && match.status === 'done' && match.winner).forEach(match => {
+  matches.filter(match => match.phase === 'Fase de grupos' && match.status === 'done' && match.winner && !match.isPractice).forEach(match => {
     const a = rows[match.teamA], b = rows[match.teamB]; if (!a || !b) return;
     const aWon = match.winner === match.teamA, loserSets = aWon ? match.setsWonB : match.setsWonA;
     const winner = aWon ? a : b, loser = aWon ? b : a;
@@ -821,8 +858,12 @@ function calculateGroupStandings(teams, matches) {
     (match.sets || []).forEach(set => { a.pointDiff += set.a - set.b; b.pointDiff += set.b - set.a; });
     winner.head[loser.name] = (winner.head[loser.name] || 0) + 1;
   });
-  const allPlayed = matches.filter(match => match.phase === 'Fase de grupos').length;
-  return Object.values(rows).sort((a, b) => b.points - a.points || b.wins - a.wins || (b.head[a.name] || 0) - (a.head[b.name] || 0) || b.pointDiff - a.pointDiff || a.name.localeCompare(b.name)).map((row, i) => ({ ...row, rank: i + 1, finished: row.played === teams.length - 1 && allPlayed > 0 }));
+  const groupMatches = matches.filter(match => match.phase === 'Fase de grupos');
+  return Object.values(rows).sort((a, b) => b.points - a.points || b.wins - a.wins || (b.head[a.name] || 0) - (a.head[b.name] || 0) || b.pointDiff - a.pointDiff || a.name.localeCompare(b.name)).map((row, i) => {
+    const expected = groupMatches.filter(match => match.teamA === row.name || match.teamB === row.name).length;
+    const completed = groupMatches.filter(match => match.status === 'done' && (match.teamA === row.name || match.teamB === row.name)).length;
+    return { ...row, rank: i + 1, finished: expected > 0 && completed === expected };
+  });
 }
 
 function snapshotMatch(match) {
