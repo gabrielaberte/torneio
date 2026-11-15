@@ -8,22 +8,29 @@ function projectCounts(source, allowedKeys) {
   const input = source && typeof source === 'object' ? source : {};
   return Object.fromEntries(allowedKeys
     .filter(key => Object.prototype.hasOwnProperty.call(input, key)
-      && (input[key] === null || (Number.isInteger(input[key]) && input[key] >= 0)))
+      && Number.isInteger(input[key]) && input[key] > 0)
     .map(key => [key, input[key]]));
 }
 
 export function projectScoutingPlayer(player) {
   const history = player.scoutingHistory || {};
-  return {
-    id: String(player.id || ''),
-    name: String(player.name || ''),
-    photo: typeof player.photo === 'string' ? player.photo : '',
-    team: String(player.team || ''),
-    isCaptain: player.isCaptain === true,
-    potColor: Number.isInteger(player.pot) && player.pot >= 0 && player.pot <= 4 ? POT_COLORS[player.pot] : null,
-    awards: projectCounts(history.awards, AWARD_KEYS),
-    podiums: projectCounts(history.podiums, PODIUM_KEYS)
-  };
+  const projected = { id: String(player.id || ''), name: String(player.name || '') };
+  if (player.team) projected.team = String(player.team);
+  if (typeof player.photo === 'string' && player.photo) projected.photo = player.photo;
+  if (player.isCaptain === true) projected.isCaptain = true;
+  if (Number.isInteger(player.pot) && player.pot >= 0 && player.pot <= 4) projected.potColor = POT_COLORS[player.pot];
+  const awards = projectCounts(history.awards, AWARD_KEYS);
+  const podiums = projectCounts(history.podiums, PODIUM_KEYS);
+  if (Object.keys(awards).length) projected.awards = awards;
+  if (Object.keys(podiums).length) projected.podiums = podiums;
+  return projected;
+}
+
+function projectPublicTeamPlayer(player) {
+  const projected = { id: String(player.id || ''), name: String(player.name || '') };
+  if (player.team) projected.team = String(player.team);
+  if (Number.isInteger(player.pot) && player.pot >= 0 && player.pot <= 4) projected.potColor = POT_COLORS[player.pot];
+  return projected;
 }
 
 async function readJson(response) {
@@ -70,28 +77,32 @@ export function buildPublicSnapshot(teams, standings, history, bracket, current,
   return {
     updatedAt: new Date().toISOString(),
     standings: teams.map(team => ({ name: team, wins: officialWins[team] })).sort((a, b) => b.wins - a.wins),
-    matches: history.map(match => ({
+    matches: history.slice(-8).map(match => ({
       teamA: match.teamA, teamB: match.teamB,
-      setsWonA: match.setsWonA, setsWonB: match.setsWonB, winner: match.winner, isPractice: match.isPractice === true
+      setsWonA: match.setsWonA, setsWonB: match.setsWonB, winner: match.winner,
+      ...(match.isPractice ? { isPractice: true } : {})
     })),
     schedule: ((bracket && bracket.matches) || []).map(match => ({
       id: match.id, phase: match.phase, teamA: match.teamA, teamB: match.teamB,
-      scheduledAt: match.scheduledAt, status: match.status, winner: match.winner,
-      setsWonA: match.setsWonA, setsWonB: match.setsWonB, isPractice: match.isPractice === true
+      ...(match.scheduledAt ? { scheduledAt: match.scheduledAt } : {}), status: match.status,
+      ...(match.winner ? { winner: match.winner } : {}),
+      ...(match.setsWonA != null ? { setsWonA: match.setsWonA } : {}),
+      ...(match.setsWonB != null ? { setsWonB: match.setsWonB } : {}),
+      ...(match.isPractice ? { isPractice: true } : {})
     })),
-    scoutingPlayers: (roster || []).map(projectScoutingPlayer),
+    scoutingPlayers: (roster || []).map(publicScoutingEnabled ? projectScoutingPlayer : projectPublicTeamPlayer),
     publicAwardsEnabled: publicAwardsEnabled === true,
     publicScoutingEnabled: publicScoutingEnabled !== false,
-    scoringPlayers: publicAwardsEnabled ? (roster || []).map(player => ({
+    ...(publicAwardsEnabled ? { scoringPlayers: (roster || []).map(player => ({
       id: String(player.id || ''), name: String(player.name || ''), team: String(player.team || ''), gender: String(player.gender || ''),
-      stats: Object.fromEntries(PUBLIC_STAT_KEYS.map(key => [key, Number(playerStats[player.id] && playerStats[player.id][key]) || 0]))
-    })) : [],
-    groups: bracket ? { groupA: bracket.groupA || [], groupB: bracket.groupB || [] } : { groupA: [], groupB: [] },
-    liveMatch: current ? {
+      stats: Object.fromEntries(PUBLIC_STAT_KEYS.map(key => [key, Number(playerStats[player.id] && playerStats[player.id][key]) || 0]).filter(([, value]) => value > 0))
+    })) } : {}),
+    ...((bracket && ((bracket.groupA || []).length || (bracket.groupB || []).length)) ? { groups: { groupA: bracket.groupA || [], groupB: bracket.groupB || [] } } : {}),
+    ...(current ? { liveMatch: {
       teamA: current.teamA, teamB: current.teamB, scoreA: current.currentSet.a,
       scoreB: current.currentSet.b, setsWonA: current.setsWonA, setsWonB: current.setsWonB,
       setNumber: current.sets.length + 1
-    } : null
+    } } : {})
   };
 }
 

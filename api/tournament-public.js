@@ -2,10 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { hasAdminSession, jsonResponse, sameOrigin } from '../server/adminAuth.js';
 import { supabaseRequest } from '../server/supabase.js';
 
-const PUBLIC_CACHE = 'public, max-age=0, s-maxage=10';
+const PUBLIC_CACHE = 'public, max-age=0, s-maxage=3600';
+const REGISTRY_CACHE = 'public, max-age=0, s-maxage=60';
 const FRESH_CACHE = 'no-store';
-function cachedJson(data, status = 200, fresh = false) {
-  return jsonResponse(data, status, { 'Cache-Control': fresh ? FRESH_CACHE : PUBLIC_CACHE });
+function cachedJson(data, status = 200, fresh = false, cache = PUBLIC_CACHE) {
+  return jsonResponse(data, status, { 'Cache-Control': fresh ? FRESH_CACHE : cache });
 }
 
 export default {
@@ -17,7 +18,7 @@ export default {
         if (registryId) {
           const query = new URLSearchParams({ select: 'id,name,updated_at', registry_id: 'eq.' + registryId, order: 'updated_at.desc' }).toString();
           const rows = await supabaseRequest('tournament_snapshots?' + query);
-          return cachedJson(rows.map(row => ({ name: row.name, binId: row.id, updatedAt: row.updated_at })));
+          return cachedJson(rows.map(row => ({ name: row.name, binId: row.id, updatedAt: row.updated_at })), 200, false, REGISTRY_CACHE);
         }
         const id = url.searchParams.get('tournament');
         if (!id) return jsonResponse({ error: 'Tournament identifier is required.' }, 400);

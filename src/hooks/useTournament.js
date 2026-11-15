@@ -14,7 +14,6 @@ export function useTournament(eventId) {
   const toast = useToast();
   const [state, setState] = useState(() => loadEventState(eventId));
   const [publicationPending, setPublicationPending] = useState(() => getPendingPublicationIds().includes(eventId));
-  const syncTimer = useRef(null);
   const loadedFor = useRef(eventId);
   const latestState = useRef(state);
   const publishAfterFinalize = useRef(false);
@@ -25,12 +24,23 @@ export function useTournament(eventId) {
     if (!publishAfterFinalize.current) return;
     publishAfterFinalize.current = false;
     publish();
-  }, [state.history.length, publish]);
+    if (!state.sync.binId) return;
+    const syncState = { ...state, updatedAt: new Date().toISOString() };
+    if (!navigator.onLine) {
+      markSyncPending(eventId);
+      return;
+    }
+    pushCloud(state.sync.binId, currentEventName(eventId), syncState).then(saved => {
+      if (saved) clearSyncPending(eventId);
+      else markSyncPending(eventId);
+    });
+  }, [state.history.length, state.sync.binId, publish]);
 
   useEffect(() => {
     async function retryPendingSync() {
       if (!eventId || !navigator.onLine || !isSyncPending(eventId)) return;
       const current = loadedFor.current === eventId ? latestState.current : loadEventState(eventId);
+      if (current.current) return;
       if (!current.sync || !current.sync.binId) return;
       const saved = await pushCloud(current.sync.binId, currentEventName(eventId), {
         ...current,
@@ -88,21 +98,10 @@ export function useTournament(eventId) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
-  // salva local sempre que o estado muda + agenda sincronizaÃ§Ã£o em nuvem (debounced)
+  // Mantem cada alteracao salva neste navegador; a sincronizacao privada ocorre ao finalizar partidas.
   useEffect(() => {
     if (!eventId) return;
-    const updatedAt = saveEventState(eventId, state);
-    if (state.sync.binId && !navigator.onLine) markSyncPending(eventId);
-    if (state.sync.binId && navigator.onLine) {
-      clearTimeout(syncTimer.current);
-      syncTimer.current = setTimeout(() => {
-        pushCloud(state.sync.binId, currentEventName(eventId), { ...state, updatedAt }).then(saved => {
-          if (saved) clearSyncPending(eventId);
-          else markSyncPending(eventId);
-        });
-      }, 4000);
-    }
-    return () => clearTimeout(syncTimer.current);
+    saveEventState(eventId, state);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, eventId]);
 

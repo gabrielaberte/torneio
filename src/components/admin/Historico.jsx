@@ -14,8 +14,8 @@ export default function Historico({ t, eventId, eventName }) {
   const [exportingWorkbook, setExportingWorkbook] = useState(false);
   const registryId = getRegistryId();
   const fixedLink = viewerUrl && registryId ? viewerUrl.replace(/\/$/, '') + '/?registry=' + registryId : null;
-  const publicSnapshot = buildPublicSnapshot(t.teams, t.state.standings, t.state.history, t.state.bracket, t.state.current, t.state.roster, t.state.playerStats, t.state.publicAwardsEnabled);
-  const awardsPreviewSnapshot = buildPublicSnapshot(t.teams, t.state.standings, t.state.history, t.state.bracket, t.state.current, t.state.roster, t.state.playerStats, true);
+  const publicSnapshot = buildPublicSnapshot(t.teams, t.state.standings, t.state.history, t.state.bracket, t.state.current, t.state.roster, t.state.playerStats, t.state.publicAwardsEnabled, t.state.publicScoutingEnabled !== false);
+  const awardsPreviewSnapshot = buildPublicSnapshot(t.teams, t.state.standings, t.state.history, t.state.bracket, t.state.current, t.state.roster, t.state.playerStats, true, t.state.publicScoutingEnabled !== false);
   useEffect(() => { checkAdminSession().then(setAuthenticated); }, []);
   async function signIn() {
     try {

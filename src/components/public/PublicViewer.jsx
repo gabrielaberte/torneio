@@ -423,7 +423,7 @@ export function ScoutingView({ snapshot, tournamentId }) {
           {filtered.map((player, index) => {
             const playerId = playerKey(player, players.indexOf(player));
             const isFavorite = favorites.includes(playerId);
-            const awards = AWARD_LABELS.filter(([key]) => Number.isInteger(player.awards && player.awards[key]) && player.awards[key] >= 0);
+            const awards = AWARD_LABELS.filter(([key]) => Number.isInteger(player.awards && player.awards[key]) && player.awards[key] > 0);
             const podiums = PODIUM_LABELS.filter(([key]) => Number.isInteger(player.podiums && player.podiums[key]) && player.podiums[key] > 0);
             return (
               <article className={`scouting-card${player.potColor ? '' : ' scouting-card-no-pot'}`} style={player.potColor ? { backgroundColor: player.potColor } : undefined} key={playerId}>
