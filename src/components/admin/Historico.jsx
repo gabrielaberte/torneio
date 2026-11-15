@@ -3,13 +3,15 @@ import { getRegistryId, getViewerUrl, setViewerUrl } from '../../lib/storage';
 import { buildPublicSnapshot, checkAdminSession, loginAdmin, logoutAdmin } from '../../lib/cloud';
 import { PublicAwardsView, PublicTeamsView, ScheduleView, ScoutingView, StandingsView } from '../public/PublicViewer';
 import { useToast } from '../ui/Toast';
+import { downloadTournamentWorkbook } from '../../lib/exportWorkbook';
 
-export default function Historico({ t, eventId }) {
+export default function Historico({ t, eventId, eventName }) {
   const toast = useToast();
   const [adminPassword, setAdminPassword] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
   const [viewerUrl, setViewerUrlState] = useState(getViewerUrl());
   const [previewTab, setPreviewTab] = useState(null);
+  const [exportingWorkbook, setExportingWorkbook] = useState(false);
   const registryId = getRegistryId();
   const fixedLink = viewerUrl && registryId ? viewerUrl.replace(/\/$/, '') + '/?registry=' + registryId : null;
   const publicSnapshot = buildPublicSnapshot(t.teams, t.state.standings, t.state.history, t.state.bracket, t.state.current, t.state.roster, t.state.playerStats, t.state.publicAwardsEnabled);
@@ -34,6 +36,18 @@ export default function Historico({ t, eventId }) {
       navigator.clipboard.writeText(data).then(() => toast('Backup copiado! Cole em uma nota segura.')).catch(() => window.prompt('Copie o texto abaixo:', data));
     } else window.prompt('Copie o texto abaixo:', data);
   }
+  async function doExportWorkbook() {
+    setExportingWorkbook(true);
+    try {
+      await downloadTournamentWorkbook({ eventName: eventName || eventId, state: t.state, teams: t.teams, groupStandings: t.groupStandings });
+      toast('Planilha de backup baixada.');
+    } catch (error) {
+      toast('Nao foi possivel gerar a planilha de backup.');
+    } finally {
+      setExportingWorkbook(false);
+    }
+  }
+
   function doImportBackup() {
     const raw = prompt('Cole aqui o backup copiado anteriormente:');
     if (raw) t.importBackup(raw);
@@ -86,6 +100,7 @@ export default function Historico({ t, eventId }) {
         <h3>Backup manual</h3>
         <div className="muted" style={{ marginBottom: 10 }}>Copie o backup de vez em quando durante o torneio.</div>
         <button className="btn btn-ghost btn-block" style={{ marginBottom: 8 }} onClick={doExport}>Copiar backup</button>
+        <button className="btn btn-ghost btn-block" style={{ marginBottom: 8 }} onClick={doExportWorkbook} disabled={exportingWorkbook}>{exportingWorkbook ? 'Gerando planilha...' : 'Baixar planilha de backup (.xlsx)'}</button>
         <button className="btn btn-ghost btn-block" onClick={doImportBackup}>Restaurar backup</button>
       </div>
       <div className="card">
